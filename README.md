@@ -1,4 +1,3 @@
-cat << 'EOF' > README.md
 # 📱 Бэкенд мессенджера Elis Messenger
 
 > 👋 **Привет! Это мой личный пет-проект (Pet Project).**  
@@ -29,4 +28,3 @@ cat << 'EOF' > README.md
 ./mvnw clean test
 ```
 После успешного завершения сборки (`BUILD SUCCESS`) отчет в формате HTML можно открыть в браузере по пути: `target/site/jacoco/index.html`.
-EOF
