@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-@SpringBootTest // Запускаем весь сервер
+@SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 public class UserControllerIntegrationTests {
@@ -33,8 +33,8 @@ public class UserControllerIntegrationTests {
         mockMvc.perform(post("/api/users/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequestBody))
-                .andExpect(status().isCreated()) // Наш статус 201 Created!
-                .andExpect(jsonPath("$.username").value("гарри")) // Проверка очистки капса
-                .andExpect(jsonPath("$.id").exists()); // Проверка генерации ID в H2
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value("гарри"))
+                .andExpect(jsonPath("$.id").exists());
     }
 }
