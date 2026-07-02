@@ -26,40 +26,31 @@ public class UserControllerTests {
     @Mock
     private UserRepository userRepository;
 
-    private User savedUserMock;
-    private final String firstUser = "поттер";
+    private User expectedDatabaseUser;
 
     @BeforeEach
-    public void setUp() {
-        savedUserMock = new User();
-        savedUserMock.setId(999L);
-        savedUserMock.setUsername(firstUser);
-    }
+    public void setUp(){
 
-
-    @Test
-    public void nameToLowerCaseAndTrimTest(){
-
-        String inputName = "   ПОТТЕР   ";
-
-        when(userRepository.findByUsername(firstUser)).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenReturn(savedUserMock);
-
-        User result = userController.loginOrRegister(inputName).getBody();
-        assertEquals(firstUser, result.getUsername());
+        expectedDatabaseUser = new User();
+        expectedDatabaseUser.setId(999L);
+        expectedDatabaseUser.setUsername("поттер");
     }
 
     @Test
     public void returnIdFromBaseTest(){
 
-        when(userRepository.findByUsername(firstUser)).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenReturn(savedUserMock);
+        User inputUser = new User();
+        inputUser.setUsername("   ПОТТЕР   ");
 
-        User result = userController.loginOrRegister(firstUser).getBody();
-        long firstUserID = 999L;
-        assertAll("Проверка генерации ID",
-                () -> assertNotNull(result.getId(), "ID не должен быть null"),
-                () -> assertEquals(firstUserID, result.getId(), "Контроллер должен вернуть ID из базы")
+        when(userRepository.findByUsername("поттер")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenReturn(expectedDatabaseUser);
+
+        User result = userController.loginOrRegister(inputUser).getBody();
+
+        assertAll("Комплексная проверка ручки авторизации",
+                () -> assertNotNull(result, "ID не должен быть null"),
+                () -> assertEquals(999L, result.getId(), "Контроллер должен вернуть ID из базы"),
+                () -> assertEquals("поттер", result.getUsername(), "Имя должно быть без капса и без пробелов")
         );
     }
 
@@ -70,7 +61,7 @@ public class UserControllerTests {
         secondUser.setId(15L);
         secondUser.setUsername("гарри");
 
-        java.util.List<User> mockUsersList = java.util.Arrays.asList(savedUserMock, secondUser);
+        java.util.List<User> mockUsersList = java.util.Arrays.asList(expectedDatabaseUser, secondUser);
 
         when(userRepository.findAll()).thenReturn(mockUsersList);
 

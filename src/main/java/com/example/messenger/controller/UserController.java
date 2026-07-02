@@ -2,6 +2,9 @@ package com.example.messenger.controller;
 
 import com.example.messenger.model.User;
 import com.example.messenger.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
@@ -15,11 +18,28 @@ public class UserController {
 
     private final UserRepository userRepository;
 
+    @Operation(
+            summary = "Вход или регистрация пользователя",
+            description = "Если пользователь с таким именем уже есть, возвращает статус 200. Если пользователя нет — создает нового со статусом 201."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Пользователь успешно найден и авторизован"),
+            @ApiResponse(responseCode = "201", description = "Новый пользователь успешно создан в базе данных"),
+            @ApiResponse(responseCode = "400", description = "Некорректный запрос: имя пользователя пустое или состоит только из пробелов")
+
+    })
+
     // Ручка входа и регистрации (POST-запрос)
     @PostMapping("/login")
-    public ResponseEntity<User> loginOrRegister(@RequestParam String username) {
+    public ResponseEntity<User> loginOrRegister(@RequestBody User user) {
 
+        String username= user.getUsername();
         // Имя пользователя приводим к одному виду, не зависим от капса
+
+        if (username== null || username.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
         String cleanUsername = username.trim().toLowerCase();
 
         // Проверяем есть ли пользователь с таким именем
@@ -27,15 +47,15 @@ public class UserController {
 
         if (existingUser.isPresent()) {
             // Если пользователь найден возвращаем его со статусом 200 OK
-            return org.springframework.http.ResponseEntity.ok(existingUser.get());
+            return ResponseEntity.ok(existingUser.get());
         } else {
             // Создаем, сохраняем и возвращаем пользователя со статусом 201 Created
             User newUser = new User();
             newUser.setUsername(cleanUsername);
             User savedUser = userRepository.save(newUser);
 
-            return org.springframework.http.ResponseEntity
-                    .status(org.springframework.http.HttpStatus.CREATED)
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
                     .body(savedUser);
         }
     }
