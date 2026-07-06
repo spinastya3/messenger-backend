@@ -28,13 +28,14 @@ public class UserControllerIntegrationTests {
     @Test
     public void testLoginConvertsToLowerCaseAndRegistersInH2() throws Exception {
 
-        String jsonRequestBody = "{\"username\":\"   ГАРРИ   \"}";
+        String jsonRequestBody = "{\"username\":\"   ГАРРИ   \", \"fcmToken\":\"integration_test_token_123\"}";
 
         mockMvc.perform(post("/api/users/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequestBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.username").value("гарри"))
-                .andExpect(jsonPath("$.id").exists());
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.fcmToken").value("integration_test_token_123"));
     }
 }
