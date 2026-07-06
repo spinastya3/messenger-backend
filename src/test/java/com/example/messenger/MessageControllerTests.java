@@ -2,7 +2,9 @@ package com.example.messenger;
 
 import com.example.messenger.controller.MessageController;
 import com.example.messenger.model.MessageDto;
+import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
+import com.example.messenger.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,6 +18,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +33,12 @@ public class MessageControllerTests {
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
+
+    @Mock
+    private UserRepository userRepository; // 🟢 Заглушка для базы юзеров
+
+    @Mock
+    private PushNotificationService pushNotificationService; // 🟢 Заглушка для пушей
 
     MessageDto testMessage = new MessageDto();
 
@@ -85,6 +94,39 @@ public class MessageControllerTests {
                 () -> assertTrue(messageTime.isBefore(java.time.LocalDateTime.now().plusSeconds(1)),
                         "Тайминг сообщения не должен превышать текущее время")
         );
+    }
+    @Test
+    public void shouldSendPushNotificationWhenMessageArrives() {
+        // 1. Готовим отправителя
+        User senderUser = new User();
+        senderUser.setUsername("гарри");
 
+        // 2. Готовим получателя (у которого в базе ХРАНИТСЯ ТОКЕН!)
+        User recipientUser = new User();
+        recipientUser.setUsername("гермиона");
+
+        // База данных вернет нам маму уже с сочным токеном!
+        User databaseRecipient = new User();
+        databaseRecipient.setUsername("гермиона");
+        databaseRecipient.setFcmToken("real_fcm_token_666");
+
+        // 3. Собираем сообщение
+        MessageDto incomingMessage = new MessageDto();
+        incomingMessage.setSender(senderUser);
+        incomingMessage.setRecipient(recipientUser);
+        incomingMessage.setContent("гермиона, привет! Пуши работают?");
+
+        // 4. Обучаем Мокито
+        when(messageRepository.save(any(MessageDto.class))).then(returnsFirstArg());
+        when(userRepository.findByUsername("гермиона")).thenReturn(java.util.Optional.of(databaseRecipient));
+
+        // 5. Делаем выстрел в контроллер!
+        messageController.processMessage(incomingMessage);
+
+        // 6. QA-Проверка: если тест дошел до конца и не выкинул ошибок —
+        // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
+        assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
+        verify(pushNotificationService)
+                .sendPushNotification("real_fcm_token_666", "Новое сообщение от гарри", "гермиона, привет! Пуши работают?");
     }
 }
