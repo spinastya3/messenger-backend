@@ -34,6 +34,7 @@ public class UserControllerTests {
         expectedDatabaseUser = new User();
         expectedDatabaseUser.setId(999L);
         expectedDatabaseUser.setUsername("поттер");
+        expectedDatabaseUser.setFcmToken("secret_fcm_token_666");
     }
 
     @Test
@@ -50,7 +51,8 @@ public class UserControllerTests {
         assertAll("Комплексная проверка ручки авторизации",
                 () -> assertNotNull(result, "ID не должен быть null"),
                 () -> assertEquals(999L, result.getId(), "Контроллер должен вернуть ID из базы"),
-                () -> assertEquals("поттер", result.getUsername(), "Имя должно быть без капса и без пробелов")
+                () -> assertEquals("поттер", result.getUsername(), "Имя должно быть без капса и без пробелов"),
+                () -> assertEquals("secret_fcm_token_666", result.getFcmToken(), "Контроллер обязан вернуть сохраненный FCM-токен")
         );
     }
 

@@ -46,12 +46,17 @@ public class UserController {
         Optional<User> existingUser = userRepository.findByUsername(cleanUsername);
 
         if (existingUser.isPresent()) {
+
+            User foundUser = existingUser.get();
+            foundUser.setFcmToken(user.getFcmToken());
+            User savedUser = userRepository.save(foundUser);
             // Если пользователь найден возвращаем его со статусом 200 OK
-            return ResponseEntity.ok(existingUser.get());
+            return ResponseEntity.ok(savedUser);
         } else {
             // Создаем, сохраняем и возвращаем пользователя со статусом 201 Created
             User newUser = new User();
             newUser.setUsername(cleanUsername);
+            newUser.setFcmToken(user.getFcmToken());
             User savedUser = userRepository.save(newUser);
 
             return ResponseEntity

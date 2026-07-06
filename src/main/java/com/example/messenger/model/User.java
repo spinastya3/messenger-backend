@@ -17,4 +17,5 @@ public class User {
 
     private Long id; // ID он же первичный ключ
     private String username; // Имя
+    private String fcmToken; // Токен дла пуша
 }
