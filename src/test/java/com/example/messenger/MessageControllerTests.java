@@ -14,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
@@ -99,14 +100,17 @@ public class MessageControllerTests {
     public void shouldSendPushNotificationWhenMessageArrives() {
         // 1. Готовим отправителя
         User senderUser = new User();
+        senderUser.setId(10L);
         senderUser.setUsername("гарри");
 
         // 2. Готовим получателя (у которого в базе ХРАНИТСЯ ТОКЕН!)
         User recipientUser = new User();
+        recipientUser.setId(20L);
         recipientUser.setUsername("гермиона");
 
         // База данных вернет нам маму уже с сочным токеном!
         User databaseRecipient = new User();
+        databaseRecipient.setId(20L);
         databaseRecipient.setUsername("гермиона");
         databaseRecipient.setFcmToken("real_fcm_token_666");
 
@@ -118,7 +122,8 @@ public class MessageControllerTests {
 
         // 4. Обучаем Мокито
         when(messageRepository.save(any(MessageDto.class))).then(returnsFirstArg());
-        when(userRepository.findByUsername("гермиона")).thenReturn(java.util.Optional.of(databaseRecipient));
+        when(userRepository.findById(20L)).thenReturn(Optional.of(databaseRecipient));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(senderUser));
 
         // 5. Делаем выстрел в контроллер!
         messageController.processMessage(incomingMessage);
@@ -127,6 +132,5 @@ public class MessageControllerTests {
         // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
         assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
         verify(pushNotificationService)
-                .sendPushNotification("real_fcm_token_666", "Новое сообщение от гарри", "гермиона, привет! Пуши работают?");
-    }
+                .sendPushNotification("real_fcm_token_666", "Новое сообщение", "гермиона, привет! Пуши работают?");    }
 }
