@@ -49,7 +49,7 @@ public class MessageController {
 
             if (recipient != null) {
                 // Ищем этого пользователя в базе, чтобы вытащить его СВЕЖИЙ сохраненный токен!
-                Optional<User> recipientFromDb = userRepository.findByUsername(recipient.getUsername());
+                Optional<User> recipientFromDb = userRepository.findById(recipient.getId());
 
                 // Проверяем что отправитель есть в БД и у него есть токен пуша
                 if (recipientFromDb.isPresent() && recipientFromDb.get().getFcmToken() != null) {
@@ -57,8 +57,16 @@ public class MessageController {
                     // охраняем токен пуша
                     String targetToken = recipientFromDb.get().getFcmToken();
 
+                    String senderName = "Пользователь";
+                    if (message.getSender() != null && message.getSender().getId() != null) {
+                        Optional<User> senderFromDb = userRepository.findById(message.getSender().getId());
+                        if (senderFromDb.isPresent()) {
+                            senderName = senderFromDb.get().getUsername();
+                        }
+                    }
+
                     // Формируем текст уведомления сверху экрана
-                    String title = "Новое сообщение от " + message.getSender().getUsername(); // имя отправителя в пуше
+                    String title = "Новое сообщение";
                     String body = message.getContent(); // текст сообщения в пуше
 
                     // Отправляем пуш
