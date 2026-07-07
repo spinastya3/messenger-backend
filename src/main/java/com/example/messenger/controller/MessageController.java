@@ -3,7 +3,7 @@ package com.example.messenger.controller;
 import com.example.messenger.PushNotificationService;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
-import com.example.messenger.model.MessageDto;
+import com.example.messenger.model.Message;
 import com.example.messenger.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -30,13 +30,13 @@ public class MessageController {
 
     // Сюда браузер будет присылать сообщения
     @MessageMapping("/chat.send")
-    public void processMessage(@Payload MessageDto message) {
+    public void processMessage(@Payload Message message) {
 
         // Записываем время на сервере в сообщение
         message.setTimestamp(LocalDateTime.now());
 
         // Сохраняем сообщение в БД
-        MessageDto savedMessage = messageRepository.save(message);
+        Message savedMessage = messageRepository.save(message);
 
         // Пересылаем сообщения из БД в чат
         messagingTemplate.convertAndSend("/topic/messages", savedMessage);
@@ -70,7 +70,7 @@ public class MessageController {
                     String body = message.getContent(); // текст сообщения в пуше
 
                     // Отправляем пуш
-                    pushNotificationService.sendPushNotification(targetToken, title, body);
+                    pushNotificationService.sendPushNotification(targetToken, title, body, message.getSender().getId(), message.getSender().getUsername());
                 }
             }
         } catch (Exception e) {
@@ -81,10 +81,10 @@ public class MessageController {
 
 
     @GetMapping("/api/chat/history")
-    public ResponseEntity<List<MessageDto>> getChatHistory(@RequestParam Long senderId, @RequestParam Long recipientId) {
+    public ResponseEntity<List<Message>> getChatHistory(@RequestParam Long senderId, @RequestParam Long recipientId) {
 
         // Запрашиваем у репозитория всю переписку между этими двумя пользователями
-        List<MessageDto> history = messageRepository.findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(
+        List<Message> history = messageRepository.findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(
                 senderId, recipientId, recipientId, senderId
         );
         return ResponseEntity.ok(history);

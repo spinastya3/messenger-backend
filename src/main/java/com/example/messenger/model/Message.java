@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "messages") // Создаем таблицу сообщений
 @Data
-public class MessageDto {
+public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

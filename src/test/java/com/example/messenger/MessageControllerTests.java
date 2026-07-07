@@ -1,7 +1,7 @@
 package com.example.messenger;
 
 import com.example.messenger.controller.MessageController;
-import com.example.messenger.model.MessageDto;
+import com.example.messenger.model.Message;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
@@ -41,7 +41,7 @@ public class MessageControllerTests {
     @Mock
     private PushNotificationService pushNotificationService; // 🟢 Заглушка для пушей
 
-    MessageDto testMessage = new MessageDto();
+    Message testMessage = new Message();
 
  @Test
  public void chatHistoryTest() {
@@ -51,18 +51,18 @@ public class MessageControllerTests {
      LocalDateTime expectedTime = LocalDateTime.of(2026, 6, 30, 14, 0, 0);
 
 
-     MessageDto testMessage = new MessageDto();
+     Message testMessage = new Message();
      testMessage.setId(555L);
      testMessage.setContent("Проверка связи");
      testMessage.setTimestamp(expectedTime);
 
-     List<MessageDto> testHistory = List.of(testMessage);
+     List<Message> testHistory = List.of(testMessage);
 
      when(messageRepository
              .findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(testSenderId, testRecipientId, testRecipientId, testSenderId))
              .thenReturn(testHistory);
 
-     List<MessageDto> result = messageController.getChatHistory(testSenderId, testRecipientId).getBody();
+     List<Message> result = messageController.getChatHistory(testSenderId, testRecipientId).getBody();
 
      assertAll("Проверка выгрузки истории чата",
              () -> assertEquals(1, result.size(), "В истории не одно сообщение"),
@@ -78,7 +78,7 @@ public class MessageControllerTests {
         testMessage.setContent("Проверяем время");
 
         LocalDateTime testStartTime = java.time.LocalDateTime.now().minusSeconds(1);
-        when(messageRepository.save(any(MessageDto.class))).then(returnsFirstArg());
+        when(messageRepository.save(any(Message.class))).then(returnsFirstArg());
         messageController.processMessage(testMessage);
 
         LocalDateTime messageTime = testMessage.getTimestamp();
@@ -115,13 +115,13 @@ public class MessageControllerTests {
         databaseRecipient.setFcmToken("real_fcm_token_666");
 
         // 3. Собираем сообщение
-        MessageDto incomingMessage = new MessageDto();
+        Message incomingMessage = new Message();
         incomingMessage.setSender(senderUser);
         incomingMessage.setRecipient(recipientUser);
         incomingMessage.setContent("гермиона, привет! Пуши работают?");
 
         // 4. Обучаем Мокито
-        when(messageRepository.save(any(MessageDto.class))).then(returnsFirstArg());
+        when(messageRepository.save(any(Message.class))).then(returnsFirstArg());
         when(userRepository.findById(20L)).thenReturn(Optional.of(databaseRecipient));
         when(userRepository.findById(10L)).thenReturn(Optional.of(senderUser));
 
@@ -132,5 +132,5 @@ public class MessageControllerTests {
         // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
         assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
         verify(pushNotificationService)
-                .sendPushNotification("real_fcm_token_666", "Новое сообщение", "гермиона, привет! Пуши работают?");    }
+                .sendPushNotification("real_fcm_token_666", "Новое сообщение", "гермиона, привет! Пуши работают?", 10L, "гарри");    }
 }
