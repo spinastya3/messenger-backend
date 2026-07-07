@@ -132,5 +132,5 @@ public class MessageControllerTests {
         // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
         assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
         verify(pushNotificationService)
-                .sendPushNotification("real_fcm_token_666", "Новое сообщение", "гермиона, привет! Пуши работают?", 10L, "гарри");    }
+                .sendPushNotification("real_fcm_token_666", "гарри", "гермиона, привет! Пуши работают?", 10L, "гарри");    }
 }

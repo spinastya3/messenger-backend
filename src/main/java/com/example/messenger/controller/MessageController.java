@@ -43,7 +43,6 @@ public class MessageController {
 
         // Шлём пуш-уведомление
         try {
-
             // Достаем объект получателя прямо из сообщения
             User recipient = message.getRecipient();
 
@@ -51,34 +50,38 @@ public class MessageController {
                 // Ищем этого пользователя в базе, чтобы вытащить его СВЕЖИЙ сохраненный токен!
                 Optional<User> recipientFromDb = userRepository.findById(recipient.getId());
 
-                // Проверяем что отправитель есть в БД и у него есть токен пуша
+                // Проверяем что получатель есть в БД и у него есть токен пуша
                 if (recipientFromDb.isPresent() && recipientFromDb.get().getFcmToken() != null) {
 
-                    // охраняем токен пуша
+                    // Сохраняем токен пуша
                     String targetToken = recipientFromDb.get().getFcmToken();
 
                     String senderName = "Пользователь";
                     if (message.getSender() != null && message.getSender().getId() != null) {
                         Optional<User> senderFromDb = userRepository.findById(message.getSender().getId());
                         if (senderFromDb.isPresent()) {
-                            senderName = senderFromDb.get().getUsername();
+                            senderName = senderFromDb.get().getUsername(); // 🟢 Достали реальное имя!
                         }
                     }
-
                     // Формируем текст уведомления сверху экрана
-                    String title = "Новое сообщение";
+                    // Напишем сразу имя отправителя в заголовок шторки, чтобы было красиво!
+                    String title = senderName;
                     String body = message.getContent(); // текст сообщения в пуше
 
-                    // Отправляем пуш
-                    pushNotificationService.sendPushNotification(targetToken, title, body, message.getSender().getId(), message.getSender().getUsername());
+                    // 🚀 ОТПРАВЛЯЕМ ПУШ: теперь тут железно подставлена переменная senderName вместо ленивого null!
+                    pushNotificationService.sendPushNotification(
+                            targetToken,
+                            title,
+                            body,
+                            message.getSender().getId(),
+                            senderName
+                    );
                 }
             }
         } catch (Exception e) {
             System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
         }
     }
-
-
 
     @GetMapping("/api/chat/history")
     public ResponseEntity<List<Message>> getChatHistory(@RequestParam Long senderId, @RequestParam Long recipientId) {
