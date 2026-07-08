@@ -5,6 +5,9 @@ import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.model.Message;
 import com.example.messenger.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -68,6 +71,12 @@ public class MessageController {
                     String title = senderName;
                     String body = message.getContent(); // текст сообщения в пуше
 
+                    if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
+                        if (body == null || body.trim().isEmpty()) {
+                            body = "Фотография";
+                        }
+                    }
+
                     // 🚀 ОТПРАВЛЯЕМ ПУШ: теперь тут железно подставлена переменная senderName вместо ленивого null!
                     pushNotificationService.sendPushNotification(
                             targetToken,
@@ -83,9 +92,23 @@ public class MessageController {
         }
     }
 
-    @GetMapping("/api/chat/history")
-    public ResponseEntity<List<Message>> getChatHistory(@RequestParam Long senderId, @RequestParam Long recipientId) {
+    @Operation(
+            summary = "Получить историю переписки между двумя пользователями",
+            description = "Скачивает из базы данных Postgres полный архив сообщений между отправителем и получателем, отсортированный по времени от старых к новым."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "История чата успешно загружена"),
+            @ApiResponse(responseCode = "400", description = "Некорректный запрос: ID отправителя или получателя пустой, равен 0 или отрицательный")
+    })
 
+    @GetMapping("/api/chat/history")
+    public ResponseEntity<?> getChatHistory(@RequestParam Long senderId, @RequestParam Long recipientId) {
+
+        if (senderId == null || senderId <= 0 || recipientId == null || recipientId <= 0) {
+            return ResponseEntity
+                    .badRequest()
+                    .body("Ошибка 400: Некорректные ID пользователей");
+        }
         // Запрашиваем у репозитория всю переписку между этими двумя пользователями
         List<Message> history = messageRepository.findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(
                 senderId, recipientId, recipientId, senderId

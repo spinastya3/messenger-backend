@@ -5,6 +5,8 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import org.springframework.stereotype.Service;
 
+import static com.example.messenger.util.AppConstants.*;
+
 @Service
 public class PushNotificationService {
 
@@ -27,8 +29,8 @@ public class PushNotificationService {
             Message message = Message.builder()
                     .setToken(targetToken)
                     .setNotification(notification)
-                    .putData("TARGET_USER_ID", String.valueOf(senderId)) // Переводим Long в String, Firebase ест только текст!
-                    .putData("TARGET_USER_NAME", senderName)
+                    .putData(KEY_TARGET_USER_ID, String.valueOf(senderId)) // Переводим Long в String, Firebase ест только текст!
+                    .putData(KEY_TARGET_USER_NAME, senderName)
                     .build();
 
             // 🚀 ДЕЛАЕМ ТОТ САМЫЙ СЕКРЕТНЫЙ ВЫСТРЕЛ В СЕРВЕРА GOOGLE!

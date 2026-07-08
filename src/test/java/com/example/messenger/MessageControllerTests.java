@@ -62,7 +62,7 @@ public class MessageControllerTests {
              .findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(testSenderId, testRecipientId, testRecipientId, testSenderId))
              .thenReturn(testHistory);
 
-     List<Message> result = messageController.getChatHistory(testSenderId, testRecipientId).getBody();
+     List<Message> result = (List<Message>) messageController.getChatHistory(testSenderId, testRecipientId).getBody();
 
      assertAll("Проверка выгрузки истории чата",
              () -> assertEquals(1, result.size(), "В истории не одно сообщение"),

@@ -24,4 +24,6 @@ public class Message {
     private User recipient;
     private String content;  // Текст сообщения
     private LocalDateTime timestamp; // Дата и время
+
+    private String imageUrl;
 }
