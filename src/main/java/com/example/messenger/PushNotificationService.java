@@ -1,8 +1,6 @@
 package com.example.messenger;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
-import com.google.firebase.messaging.Notification;
+import com.google.firebase.messaging.*;
 import org.springframework.stereotype.Service;
 
 import static com.example.messenger.util.AppConstants.*;
@@ -24,11 +22,21 @@ public class PushNotificationService {
                     .setBody(body)
                     .build();
 
+            AndroidConfig androidConfig = AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH) // 🔥 ВЫСШИЙ ПРИОРИТЕТ! Пробивает Doze Mode телефона!
+                    .setNotification(AndroidNotification.builder()
+                            .setSound("default") // Добавляем стандартный звук пули, чтобы телефон пищал!
+                            .setDefaultSound(true)
+                            .build())
+                    .build();
+
+
             // 🥷 Упаковываем посылку: пишем адрес, визуальную плашку
             // И ВШИВАЕМ КЛЮЧИ СТРОГО КРУПНЫМИ БУКВАМИ, как их ждет наша мобилка по умолчанию!
             Message message = Message.builder()
                     .setToken(targetToken)
                     .setNotification(notification)
+                    .setAndroidConfig(androidConfig)
                     .putData(KEY_TARGET_USER_ID, String.valueOf(senderId)) // Переводим Long в String, Firebase ест только текст!
                     .putData(KEY_TARGET_USER_NAME, senderName)
                     .build();
