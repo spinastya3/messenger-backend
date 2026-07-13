@@ -84,11 +84,16 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- 🟢 БИБЛИОТЕКА GOOGLE FIREBASE ДЛЯ ОТПРАВКИ ПУШЕЙ -->
         <dependency>
             <groupId>com.google.firebase</groupId>
             <artifactId>firebase-admin</artifactId>
             <version>9.3.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.25.15</version>
         </dependency>
     </dependencies>
 
