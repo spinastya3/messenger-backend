@@ -69,4 +69,45 @@ public class FileController {
                     .body("Ошибка сохранения файла на диск: " + e.getMessage());
         }
     }
+    // 📡 МУЛЬТИМЕДИЙНЫЙ ШЛЮЗ РАЗДАЧИ: Теперь ExoPlayer сможет читать видео кусочками (Range-запросы)!
+    @Operation(summary = "Раздача видео и фото потоком (HTTP Range)")
+    @GetMapping("/uploads/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.support.ResourceRegion> getVideo(
+            @PathVariable String filename,
+            @RequestHeader org.springframework.http.HttpHeaders headers) throws IOException {
+
+        // Читаем файл с твоего вечного диска Амверы
+        java.nio.file.Path filePath = java.nio.file.Paths.get(UPLOAD_DIR).resolve(filename);
+        org.springframework.core.io.Resource video = new org.springframework.core.io.UrlResource(filePath.toUri());
+
+        if (!video.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        long contentLength = video.contentLength();
+        long chunkSize = Math.min(1024 * 1024L, contentLength); // Читаем видео шагами по 1 МБ
+        org.springframework.core.io.support.ResourceRegion region;
+
+        // Перехватываем Range-заголовки от гугловского ExoPlayer
+        java.util.List<org.springframework.http.HttpRange> ranges = headers.getRange();
+        org.springframework.http.HttpRange range = ranges.isEmpty() ? null : ranges.get(0);
+
+        if (range != null) {
+            long start = range.getRangeStart(contentLength);
+            long end = range.getRangeEnd(contentLength);
+            long rangeLength = Math.min(chunkSize, end - start + 1);
+            region = new org.springframework.core.io.support.ResourceRegion(video, start, rangeLength);
+        } else {
+            region = new org.springframework.core.io.support.ResourceRegion(video, 0, Math.min(chunkSize, contentLength));
+        }
+
+        String contentType = java.nio.file.Files.probeContentType(filePath);
+        if (contentType == null) contentType = "video/mp4";
+
+        // 🔥 ШЕЙКХЕНД С ПЛЕЕРОМ: Возвращаем статус 206 Partial Content — ExoPlayer будет в экстазе!
+        return ResponseEntity.status(org.springframework.http.HttpStatus.PARTIAL_CONTENT)
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .body(region);
+    }
 }
+
