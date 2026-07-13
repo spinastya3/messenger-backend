@@ -5,17 +5,23 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.UUID.randomUUID;
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.*;
 
 @RestController
 @RequestMapping("/api/files")
@@ -57,10 +63,10 @@ public class FileController {
             // 🚀 Сохраняем бинарный файл на диск Амверы!
             file.transferTo(destFile);
 
-            // Формируем прямую ссылку, по которой мобилка сможет скачать эту фотку обратно
-            String fileDownloadUrl = "/uploads/" + uniqueFileName;
+            String prefix = uniqueFileName.toLowerCase().endsWith(".mp4") ? "/uploads/videos/" : "/uploads/photos/";
+            String fileDownloadUrl = prefix + uniqueFileName;
 
-            // Возвращаем мобилке JSON с готовым адресом картинки
+            // Возвращаем JSON (imageUrl подхватит и полная ссылка на мобилке)
             return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
 
         } catch (IOException e) {
@@ -69,44 +75,57 @@ public class FileController {
                     .body("Ошибка сохранения файла на диск: " + e.getMessage());
         }
     }
-    // 📡 МУЛЬТИМЕДИЙНЫЙ ШЛЮЗ РАЗДАЧИ: Теперь ExoPlayer сможет читать видео кусочками (Range-запросы)!
-    @Operation(summary = "Раздача видео и фото потоком (HTTP Range)")
-    @GetMapping("/uploads/{filename:.+}")
-    public ResponseEntity<org.springframework.core.io.support.ResourceRegion> getVideo(
-            @PathVariable String filename,
-            @RequestHeader org.springframework.http.HttpHeaders headers) throws IOException {
 
-        // Читаем файл с твоего вечного диска Амверы
-        java.nio.file.Path filePath = java.nio.file.Paths.get(UPLOAD_DIR).resolve(filename);
-        org.springframework.core.io.Resource video = new org.springframework.core.io.UrlResource(filePath.toUri());
+    @GetMapping("/uploads/photos/{filename:.+}")
+    public ResponseEntity<Resource> getPhoto(@PathVariable String filename) throws IOException {
+        Path filePath = Paths.get(UPLOAD_DIR).resolve(filename);
+        Resource resource = new UrlResource(filePath.toUri());
+
+        if (!resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String contentType = java.nio.file.Files.probeContentType(filePath);
+        if (contentType == null) contentType = "image/jpeg";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
+    }
+    // 📡 МУЛЬТИМЕДИЙНЫЙ ШЛЮЗ РАЗДАЧИ: Теперь ExoPlayer сможет читать видео кусочками (Range-запросы)!
+    @GetMapping("/uploads/videos/{filename:.+}")
+    public ResponseEntity<ResourceRegion> getVideo(
+            @PathVariable String filename,
+            @RequestHeader HttpHeaders headers) throws java.io.IOException {
+
+        Path filePath = Paths.get(UPLOAD_DIR).resolve(filename);
+        Resource video = new UrlResource(filePath.toUri());
 
         if (!video.exists()) {
             return ResponseEntity.notFound().build();
         }
 
         long contentLength = video.contentLength();
-        long chunkSize = Math.min(1024 * 1024L, contentLength); // Читаем видео шагами по 1 МБ
-        org.springframework.core.io.support.ResourceRegion region;
+        long chunkSize = Math.min(1024 * 1024L, contentLength); // Стримим шагами по 1 МБ
+        ResourceRegion region;
 
-        // Перехватываем Range-заголовки от гугловского ExoPlayer
-        java.util.List<org.springframework.http.HttpRange> ranges = headers.getRange();
-        org.springframework.http.HttpRange range = ranges.isEmpty() ? null : ranges.get(0);
+        List<HttpRange> ranges = headers.getRange();
+        HttpRange range = ranges.isEmpty() ? null : ranges.get(0);
 
         if (range != null) {
             long start = range.getRangeStart(contentLength);
             long end = range.getRangeEnd(contentLength);
             long rangeLength = Math.min(chunkSize, end - start + 1);
-            region = new org.springframework.core.io.support.ResourceRegion(video, start, rangeLength);
+            region = new ResourceRegion(video, start, rangeLength);
         } else {
-            region = new org.springframework.core.io.support.ResourceRegion(video, 0, Math.min(chunkSize, contentLength));
+            region = new ResourceRegion(video, 0, Math.min(chunkSize, contentLength));
         }
 
-        String contentType = java.nio.file.Files.probeContentType(filePath);
+        String contentType = Files.probeContentType(filePath);
         if (contentType == null) contentType = "video/mp4";
 
-        // 🔥 ШЕЙКХЕНД С ПЛЕЕРОМ: Возвращаем статус 206 Partial Content — ExoPlayer будет в экстазе!
-        return ResponseEntity.status(org.springframework.http.HttpStatus.PARTIAL_CONTENT)
-                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+        return ResponseEntity.status(PARTIAL_CONTENT)
+                .contentType(MediaType.parseMediaType(contentType))
                 .body(region);
     }
 }
