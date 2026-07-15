@@ -31,7 +31,7 @@ public class AuthService {
     }
 
     // Регистрируем пользователя, если логин уникальный
-    public Map<String, String> register(String username, String rawPassword, String email) {
+    public Map<String, String> register(String username, String rawPassword, String email, String fcmToken) {
 
         Optional.ofNullable(username)
                 .filter(u -> !u.trim().isEmpty())
@@ -69,6 +69,7 @@ public class AuthService {
                 .username(username)
                 .password(encodedPassword)
                 .email(email)
+                .fcmToken(fcmToken)
                 .build();
 
         // Сохраняем юзера в БД

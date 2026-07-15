@@ -35,6 +35,9 @@ class AuthServiceTest {
     @InjectMocks
     private AuthService authService;
 
+    private static final String MOCK_FCM_TOKEN = "mock_firebase_token_2026_secure";
+
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -51,8 +54,7 @@ class AuthServiceTest {
         when(userRepository.existsByEmail(email)).thenReturn(false);
         when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
 
-        Map<String, String> response = authService.register(username, rawPassword, email);
-
+        Map<String, String> response = authService.register(username, rawPassword, email, MOCK_FCM_TOKEN);
         assertNotNull(response);
         assertEquals("Поздравляю! Вы в ElisMessenger!", response.get("message"));
         verify(userRepository, times(1)).save(any(User.class));
@@ -63,7 +65,7 @@ class AuthServiceTest {
         String emailWithoutAt = "garrypotter.com";
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("Гарри", "test", emailWithoutAt)
+                authService.register("Гарри", "test", emailWithoutAt, MOCK_FCM_TOKEN)
         );
         assertEquals("Введите корректный Email!", exception.getMessage());
     }
@@ -74,7 +76,7 @@ class AuthServiceTest {
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(new User()));
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register(username, "test", "test@mail.com")
+                authService.register(username, "test", "test@mail.com", MOCK_FCM_TOKEN)
         );
         assertEquals("Пользователь с таким логином уже существует!", exception.getMessage());
     }
@@ -113,7 +115,7 @@ class AuthServiceTest {
     @Test
     void register_ThrowsException_WhenFieldsAreBlank() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("   ", "test", "test@mail.com")
+                authService.register("   ", "test", "test@mail.com", MOCK_FCM_TOKEN)
         );
         assertEquals("Введите логин!", exception.getMessage());
     }
@@ -125,7 +127,7 @@ class AuthServiceTest {
         when(userRepository.existsByEmail(email)).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("new_user", "test", email)
+                authService.register("new_user", "test", email, MOCK_FCM_TOKEN)
         );
         assertEquals("Пользователь с такой почтой уже существует!", exception.getMessage());
     }

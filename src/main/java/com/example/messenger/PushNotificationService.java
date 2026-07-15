@@ -37,6 +37,8 @@ public class PushNotificationService {
                     .setToken(targetToken)
                     .setNotification(notification)
                     .setAndroidConfig(androidConfig)
+                    .putData("title", title) // Или подставь константу AppConstants.KEY_PUSH_TITLE
+                    .putData("body", body)
                     .putData(KEY_TARGET_USER_ID, String.valueOf(senderId)) // Переводим Long в String, Firebase ест только текст!
                     .putData(KEY_TARGET_USER_NAME, senderName)
                     .build();

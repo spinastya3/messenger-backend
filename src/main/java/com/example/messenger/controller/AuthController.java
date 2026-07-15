@@ -37,8 +37,9 @@ public class AuthController {
             String username = request.get("username");
             String password = request.get("password");
             String email = request.get("email");
+            String fcmToken = request.get("fcmToken");
 
-            Map<String, String> response = authService.register(username, password, email);
+            Map<String, String> response = authService.register(username, password, email, fcmToken);
 
             return ResponseEntity.status(CREATED).body(response);
 
