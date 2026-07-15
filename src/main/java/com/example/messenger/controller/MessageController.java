@@ -110,9 +110,7 @@ public class MessageController {
                     .body("Ошибка 400: Некорректные ID пользователей");
         }
         // Запрашиваем у репозитория всю переписку между этими двумя пользователями
-        List<Message> history = messageRepository.findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(
-                senderId, recipientId, recipientId, senderId
-        );
+        List<Message> history = messageRepository.findChatHistory(senderId, recipientId);
         return ResponseEntity.ok(history);
     }
 }

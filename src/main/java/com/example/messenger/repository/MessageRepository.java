@@ -1,16 +1,19 @@
-package com.example.messenger.repository;
+package com.example.messenger.repository; // 🟢 Проверь свой пакет!
+
 import com.example.messenger.model.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.List;
 
-// Сохраняем переписку сообщений и выгружаем историю чата
-@Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    List<Message> findBySenderIdAndRecipientIdOrSenderIdAndRecipientIdOrderByTimestampAsc(
-            Long senderId1, Long recipientId1, Long senderId2, Long recipientId2
-    );
+    // 🚀 БРОНЕБОЙНЫЙ ENTERPRISE-ЗАПРОС НА ЧИСТОМ JPQL:
+    // Мы явно объясняем Спрингу: найди переписку, где (отправитель = А и получатель = Б) ИЛИ (отправитель = Б и получатель = А)
+    @Query("SELECT m FROM Message m WHERE " +
+            "(m.sender.id = :sId AND m.recipient.id = :rId) OR " +
+            "(m.sender.id = :rId AND m.recipient.id = :sId) " +
+            "ORDER BY m.timestamp ASC")
+    List<Message> findChatHistory(@Param("sId") Long senderId, @Param("rId") Long recipientId);
 }
 
