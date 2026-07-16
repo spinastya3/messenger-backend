@@ -17,6 +17,7 @@ import static org.springframework.http.HttpStatus.*;
 @RestController
 @RequestMapping("/api/users") // Все запросы будут начинаться с этого адреса
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "User Controller", description = "Управление профилями пользователей и безопасным поиском контактов")
 public class UserController {
 
