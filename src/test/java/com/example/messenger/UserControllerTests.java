@@ -40,7 +40,7 @@ public class UserControllerTests {
         User mockUser = User.builder().id(1L).username("Мама").email("mama@mail.com").build();
 
         // Обучаем репозиторий отдавать наш фейковый список при поиске
-        when(userRepository.findByUsernameContainingIgnoreCase(searchName)).thenReturn(List.of(mockUser));
+        when(userRepository.searchUsersByUsernameIgnoreCase(searchName)).thenReturn(List.of(mockUser));
 
         // 🚀 ВЫСТРЕЛИВАЕМ ТЕСТОВЫМ ЗАПРОСОМ С ПАРАМЕТРОМ:
         mockMvc.perform(get("/api/users/search")
@@ -50,7 +50,7 @@ public class UserControllerTests {
                 .andExpect(jsonPath("$[0].username").value("Мама"))
                 .andExpect(jsonPath("$[0].id").value(1));
 
-        verify(userRepository, times(1)).findByUsernameContainingIgnoreCase(searchName);
+        verify(userRepository, times(1)).searchUsersByUsernameIgnoreCase(searchName);
     }
 
     @Test
