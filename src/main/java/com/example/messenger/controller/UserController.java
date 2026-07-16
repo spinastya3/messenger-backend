@@ -32,10 +32,9 @@ public class UserController {
     })
     @GetMapping("/search")
     public ResponseEntity<List<User>> searchUsers(@RequestParam("username") String username) {
-        if (username == null || username.trim().isEmpty()) {
+        if (username == null || username.trim().length() < 3) {
             return ResponseEntity.ok(List.of());
         }
-
         List<User> foundUsers = userRepository.findByUsernameContainingIgnoreCase(username.trim());
         return ResponseEntity.ok(foundUsers);
     }
