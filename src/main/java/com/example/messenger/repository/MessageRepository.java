@@ -10,13 +10,14 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Query("SELECT m FROM Message m WHERE " +
-            "(m.senderId = :id1 AND m.recipientId = :id2) OR " +
-            "(m.senderId = :id2 AND m.recipientId = :id1) " +
+            "(m.sender.id = :sId AND m.recipient.id = :rId) OR " +
+            "(m.sender.id = :rId AND m.recipient.id = :sId) " +
             "ORDER BY m.timestamp ASC")
-    List<Message> findChatHistory(@Param("id1") long id1, @Param("id2") long id2);
+    List<Message> findChatHistory(@Param("sId") Long senderId, @Param("rId") Long recipientId);
 
-    @Query("SELECT DISTINCT CASE WHEN m.senderId = :userId THEN m.recipientId ELSE m.senderId END " +
-            "FROM Message m WHERE m.senderId = :userId OR m.recipientId = :userId")
+    // 🚀 2. ИСПРАВИЛИ ТУТ ДЛЯ АКТИВНЫХ ДIАЛОГОВ: Тоже переводим на объектный стиль через точку!
+    @Query("SELECT DISTINCT CASE WHEN m.sender.id = :userId THEN m.recipient.id ELSE m.sender.id END " +
+            "FROM Message m WHERE m.sender.id = :userId OR m.recipient.id = :userId")
     List<Long> findActiveChatBuddyIds(@Param("userId") Long userId);
 }
 
