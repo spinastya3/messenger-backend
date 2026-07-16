@@ -35,7 +35,7 @@ public class UserController {
         if (username == null || username.trim().length() < 3) {
             return ResponseEntity.ok(List.of());
         }
-        List<User> foundUsers = userRepository.findByUsernameContainingIgnoreCase(username.trim());
+        List<User> foundUsers = userRepository.searchUsersByUsernameIgnoreCase(username.trim());
         return ResponseEntity.ok(foundUsers);
     }
 

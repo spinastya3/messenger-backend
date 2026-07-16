@@ -2,6 +2,8 @@ package com.example.messenger.repository;
 
 import com.example.messenger.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,5 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Проверяем email на уникальность
     boolean existsByEmail(String email);
     // Ищем зарегестрированного пользователя
-    List<User> findByUsernameContainingIgnoreCase(String username);
+    @Query("SELECT u FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :username, '%'))")
+    List<User> searchUsersByUsernameIgnoreCase(@Param("username") String username);
 }
