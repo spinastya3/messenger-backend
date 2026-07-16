@@ -3,13 +3,13 @@ package com.example.messenger;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.service.AuthService;
+import com.example.messenger.service.EmailService;
 import com.example.messenger.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Map;
@@ -18,7 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class AuthServiceTest {
+class AuthServiceTests {
 
     @Mock
     private UserRepository userRepository;
@@ -30,7 +30,7 @@ class AuthServiceTest {
     private JwtUtil jwtUtil;
 
     @Mock
-    private JavaMailSender mailSender;
+    private  EmailService emailService;
 
     @InjectMocks
     private AuthService authService;
@@ -91,7 +91,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches(rawPassword, "hash")).thenReturn(true);
         when(jwtUtil.generateToken(username, 7L)).thenReturn("mocked_jwt_token_string");
 
-        Map<String, String> response = authService.login(username, rawPassword);
+        Map<String, String> response = authService.login(username, rawPassword, MOCK_FCM_TOKEN);
 
         assertEquals("mocked_jwt_token_string", response.get("token"));
         assertEquals("7", response.get("userId"));
@@ -107,7 +107,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("wrong_password", "correct_hash")).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.login(username, "wrong_password")
+                authService.login(username, "wrong_password", MOCK_FCM_TOKEN)
         );
         assertEquals("Неверный пароль!", exception.getMessage());
     }

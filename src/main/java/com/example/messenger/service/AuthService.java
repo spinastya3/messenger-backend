@@ -19,15 +19,15 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final JavaMailSender mailSender; // 📧 Подключаем почтовик!
+    private final EmailService emailService; // 📧 Подключаем почтовик!
 
     private final Map<String, String> resetCodesCache = new ConcurrentHashMap<>();
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, JavaMailSender mailSender) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
-        this.mailSender = mailSender;
+        this.emailService = emailService;
     }
 
     // Регистрируем пользователя, если логин уникальный
@@ -75,11 +75,13 @@ public class AuthService {
         // Сохраняем юзера в БД
         userRepository.save(newUser);
 
+        emailService.sendWelcomeEmail(email, username);
+
         return Map.of("message", "Поздравляю! Вы в ElisMessenger!");
     }
 
     // Авторизуем пользователя
-    public Map<String, String> login(String username, String rawPassword) {
+    public Map<String, String> login(String username, String rawPassword, String fcmToken) {
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с таким логином не найден!"));
@@ -87,6 +89,9 @@ public class AuthService {
         Optional.of(user)
                 .filter(u -> passwordEncoder.matches(rawPassword, u.getPassword()))
                 .orElseThrow(() -> new IllegalArgumentException("Неверный пароль!"));
+
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getId());
 
@@ -104,28 +109,9 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с такой почтой не зарегистрирован!"));
 
         String resetCode = String.format("%06d", new Random().nextInt(1000000));
-
         resetCodesCache.put(email, resetCode);
 
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("elismassenger@yandex.ru");
-            message.setTo(email);
-            message.setSubject("ElisMessenger — Сброс пароля 🔐");
-            message.setText("Привет, " + user.getUsername() + "!\n\n" +
-                    "Кто-то (надеемся, что ты) запросил сброс пароля в ElisMessenger.\n" +
-                    "Твой секретный код восстановления: " + resetCode + "\n\n" +
-                    "Код действует 10 минут. Если это не ты, просто проигнорируй это письмо. 😉");
-
-            mailSender.send(message);
-            System.out.println("📧 [SMTP] Письмо успешно улетело на " + email);
-
-        } catch (Exception e) {
-            System.err.println("❌ Критическая ошибка SMTP: " + e.getMessage());
-            throw new IllegalArgumentException("Не удалось отправить письмо. Повторите попытку позже!");
-        }
-
-        resetCodesCache.put(email, resetCode);
+        emailService.sendResetCodeEmail(email, user.getUsername(), resetCode);
 
         return Map.of(
                 "message", "Код восстановления отправлен на вашу почту!",
@@ -149,7 +135,6 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(newRawPassword));
         userRepository.save(user);
-
         resetCodesCache.remove(email);
 
         return Map.of("message", "Пароль успешно изменен! Войдите с новым паролем.");

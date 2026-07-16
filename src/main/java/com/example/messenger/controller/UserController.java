@@ -1,14 +1,15 @@
 package com.example.messenger.controller;
 
 import com.example.messenger.model.User;
+import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
-import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -16,26 +17,46 @@ import static org.springframework.http.HttpStatus.*;
 @RestController
 @RequestMapping("/api/users") // Все запросы будут начинаться с этого адреса
 @RequiredArgsConstructor
+@Tag(name = "User Controller", description = "Управление профилями пользователей и безопасным поиском контактов")
 public class UserController {
 
     private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
 
     @Operation(
-            summary = "Получить список всех зарегистрированных пользователей",
-            description = "Вытаскивает из базы данных Postgres абсолютно всех юзеров для экрана контактов мобилки."
+            summary = "Поиск пользователей",
+            description = "Ищет зарегистрированных людей в базе Postgres по буквам логина, полностью игнорируя регистр (большие/маленькие буквы)."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Список пользователей успешно получен")
+            @ApiResponse(responseCode = "200", description = "Поиск успешно отработал. Возвращает список совпавших пользователей (или пустой массив).")
     })
-    @GetMapping("/all")
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userRepository.findAll();
-        return ResponseEntity.ok(users);
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(@RequestParam("username") String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<User> foundUsers = userRepository.findByUsernameContainingIgnoreCase(username.trim());
+        return ResponseEntity.ok(foundUsers);
+    }
+
+    @Operation(
+            summary = "Получить список активных диалогов пользователя",
+            description = "Вытаскивает из базы Postgres только тех пользователей, с кем у текущего юзера есть история сообщений."
+    )
+    @GetMapping("/active-chats/{userId}")
+    public ResponseEntity<List<User>> getActiveChats(@PathVariable Long userId) {
+        List<Long> buddyIds = messageRepository.findActiveChatBuddyIds(userId);
+        if (buddyIds.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<User> activeUsers = userRepository.findAllById(buddyIds);
+        return ResponseEntity.ok(activeUsers);
     }
 
     @Operation(
             summary = "Удалить пользователя по его ID",
-            description = "Жестко вырезает пользователя из таблицы Postgres. Полезно при тестах, чтобы стирать мусорные профили."
+            description = "Удаляет пользователя из таблицы Postgres. Для тестов"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Пользователь успешно стерт из базы данных"),

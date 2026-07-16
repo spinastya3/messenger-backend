@@ -62,8 +62,9 @@ public class AuthController {
         try {
             String username = request.get("username");
             String password = request.get("password");
+            String fcmToken = request.get("fcmToken");
 
-            Map<String, String> response = authService.login(username, password);
+            Map<String, String> response = authService.login(username, password, fcmToken);
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {

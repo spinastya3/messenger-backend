@@ -58,8 +58,7 @@ public class MessageControllerTests {
 
      List<Message> testHistory = List.of(testMessage);
 
-     when(messageRepository
-             .findChatHistory(testSenderId, testRecipientId))
+     when(messageRepository.findChatHistory(testSenderId, testRecipientId))
              .thenReturn(testHistory);
 
      List<Message> result = (List<Message>) messageController.getChatHistory(testSenderId, testRecipientId).getBody();
