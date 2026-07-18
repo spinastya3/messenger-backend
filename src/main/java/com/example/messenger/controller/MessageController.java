@@ -43,9 +43,21 @@ public class MessageController {
         // Сохраняем сообщение в БД
         Message savedMessage = messageRepository.save(message);
 
-        // Пересылаем сообщения из БД в чат
-        messagingTemplate.convertAndSend("/topic/messages", savedMessage);
+        if (savedMessage.getRecipient() != null && savedMessage.getRecipient().getId() != null) {
+            messagingTemplate.convertAndSendToUser(
+                    String.valueOf(savedMessage.getRecipient().getId()),
+                    "/queue/messages",
+                    savedMessage
+            );
+        }
 
+        if (savedMessage.getSender() != null && savedMessage.getSender().getId() != null) {
+            messagingTemplate.convertAndSendToUser(
+                    String.valueOf(savedMessage.getSender().getId()),
+                    "/queue/messages",
+                    savedMessage
+            );
+        }
         // Шлём пуш-уведомление
         try {
             // Достаем объект получателя прямо из сообщения
