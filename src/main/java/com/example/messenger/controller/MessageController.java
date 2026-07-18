@@ -43,21 +43,19 @@ public class MessageController {
         // Сохраняем сообщение в БД
         Message savedMessage = messageRepository.save(message);
 
-        if (savedMessage.getRecipient() != null && savedMessage.getRecipient().getId() != null) {
-            messagingTemplate.convertAndSendToUser(
-                    String.valueOf(savedMessage.getRecipient().getId()),
-                    "/queue/messages",
-                    savedMessage
-            );
+        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+            String recipientIdStr = String.valueOf(message.getRecipient().getId());
+            // Шлём точную копию в сокет получателю (дочке)
+            messagingTemplate.convertAndSendToUser(recipientIdStr, "/queue/messages", savedMessage);
         }
 
-        if (savedMessage.getSender() != null && savedMessage.getSender().getId() != null) {
-            messagingTemplate.convertAndSendToUser(
-                    String.valueOf(savedMessage.getSender().getId()),
-                    "/queue/messages",
-                    savedMessage
-            );
+        if (message.getSender() != null && message.getSender().getId() != null) {
+            String senderIdStr = String.valueOf(message.getSender().getId());
+            // Шлём точную копию в сокет отправителю (тебе на эмулятор!),
+            // чтобы сработал твой входящий сокет-лисенер для медиафайлов!
+            messagingTemplate.convertAndSendToUser(senderIdStr, "/queue/messages", savedMessage);
         }
+
         // Шлём пуш-уведомление
         try {
             // Достаем объект получателя прямо из сообщения
