@@ -1,5 +1,6 @@
 package com.example.messenger.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -13,15 +14,24 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Profile("!test")
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    // 🚀 СЕНЬОРСКИЙ ВЫСТРЕЛ №1: Создаем полноценный, управляемый бин планировщика!
+    // Спринг сам его инициализирует в памяти Амверы, и контекст больше никогда не упадет!
+    @Bean
+    public ThreadPoolTaskScheduler messageBrokerTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("stomp-heartbeat-thread-");
+        scheduler.initialize(); // 🟩 Принудительно оживляем потоки таймера!
+        return scheduler;
+    }
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // 🚀 СЕНЬОРСКИЙ ВЫСТРЕЛ ПО ЗАМОРОЗКЕ АМВЕРЫ:
-        // 1. Добавляем в префиксы брокера "/queue" (чтобы работали персональные очереди, если понадобятся)
-        // 2. Включаем принудительный Heartbeat (Пинг-Понг) со стороны сервера каждые 10 секунд (10000 миллисекунд)
-        // 3. Регистрируем для этого встроенный планировщик задач Spring TaskScheduler
+        // 🚀 СЕНЬОРСКИЙ ВЫСТРЕЛ №2: Включаем 10-секундный Пинг-Понг,
+        // подставляя наш стопроцентно инициализированный бин планировщика!
         config.enableSimpleBroker("/topic", "/queue")
-                .setHeartbeatValue(new long[]{10000, 10000}) // Пинг от сервера к клиенту и обратно раз в 10 сек
-                .setTaskScheduler(new ThreadPoolTaskScheduler()); // Включаем таймер пинга
+                .setHeartbeatValue(new long[]{10000, 10000}) // Пинг раз в 10 сек (пробиваем прокси Амверы!)
+                .setTaskScheduler(messageBrokerTaskScheduler()); // 🟩 Подвязали живой таймер!
 
         // Префикс адреса, на который телефон шлет сообщение
         config.setApplicationDestinationPrefixes("/app");
