@@ -33,7 +33,7 @@ public class MessageController {
     private final UserRepository userRepository; // Пользователи
     private final PushNotificationService pushNotificationService; // Пуши
 
-    // Сюда браузер будет присылать сообщения
+    // Сюда приходят сообщения
     @MessageMapping("/chat.send")
     public void processMessage(@Payload Message message) {
 
@@ -57,7 +57,7 @@ public class MessageController {
             User recipient = message.getRecipient();
 
             if (recipient != null) {
-                // Ищем этого пользователя в базе, чтобы вытащить его СВЕЖИЙ сохраненный токен!
+                // Ищем этого пользователя в базе, чтобы вытащить его сохраненный токен
                 Optional<User> recipientFromDb = userRepository.findById(recipient.getId());
 
                 // Проверяем что получатель есть в БД и у него есть токен пуша
@@ -70,11 +70,10 @@ public class MessageController {
                     if (message.getSender() != null && message.getSender().getId() != null) {
                         Optional<User> senderFromDb = userRepository.findById(message.getSender().getId());
                         if (senderFromDb.isPresent()) {
-                            senderName = senderFromDb.get().getUsername(); // 🟢 Достали реальное имя!
-                        }
+                            senderName = senderFromDb.get().getUsername();
                     }
+
                     // Формируем текст уведомления сверху экрана
-                    // Напишем сразу имя отправителя в заголовок шторки, чтобы было красиво!
                     String title = senderName;
                     String body = message.getContent(); // текст сообщения в пуше
 
@@ -84,7 +83,7 @@ public class MessageController {
                         }
                     }
 
-                    // 🚀 ОТПРАВЛЯЕМ ПУШ: теперь тут железно подставлена переменная senderName вместо ленивого null!
+                    // Отправляем пуш
                     pushNotificationService.sendPushNotification(
                             targetToken,
                             title,
@@ -116,7 +115,6 @@ public class MessageController {
                     .badRequest()
                     .body("Ошибка 400: Некорректные ID пользователей");
         }
-        // Запрашиваем у репозитория всю переписку между этими двумя пользователями
         List<Message> history = messageRepository.findChatHistory(senderId, recipientId);
         return ResponseEntity.ok(history);
     }
