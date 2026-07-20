@@ -168,12 +168,11 @@ public class FileController {
                     }
                 }
 
-                String fileDownloadUrl = "/uploads/" + fileName;
+                String fileDownloadUrl = "/" + fileName;
                 return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
 
             }
 
-            // Если это промежуточный кусок - просто говорим Андроиду "Жду следующий!"
             return ResponseEntity.ok(Map.of("status", "chunk_saved", "index", chunkIndex));
 
         } catch (Exception e) {
