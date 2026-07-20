@@ -168,7 +168,7 @@ public class FileController {
                     }
                 }
 
-                String fileDownloadUrl = "/" + fileName;
+                String fileDownloadUrl = "/uploads/" + fileName;
                 return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
 
             }
