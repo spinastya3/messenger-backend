@@ -71,31 +71,32 @@ public class MessageController {
                         Optional<User> senderFromDb = userRepository.findById(message.getSender().getId());
                         if (senderFromDb.isPresent()) {
                             senderName = senderFromDb.get().getUsername();
-                    }
-
-                    // Формируем текст уведомления сверху экрана
-                    String title = senderName;
-                    String body = message.getContent(); // текст сообщения в пуше
-
-                    if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
-                        if (body == null || body.trim().isEmpty()) {
-                            body = "Фотография";
                         }
-                    }
 
-                    // Отправляем пуш
-                    pushNotificationService.sendPushNotification(
-                            targetToken,
-                            title,
-                            body,
-                            message.getSender().getId(),
-                            senderName
-                    );
+                        // Формируем текст уведомления сверху экрана
+                        String title = senderName;
+                        String body = message.getContent(); // текст сообщения в пуше
+
+                        if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
+                            if (body == null || body.trim().isEmpty()) {
+                                body = "Фотография";
+                            }
+                        }
+
+                        // Отправляем пуш
+                        pushNotificationService.sendPushNotification(
+                                targetToken,
+                                title,
+                                body,
+                                message.getSender().getId(),
+                                senderName
+                        );
+                    }
                 }
             }
-        } catch (Exception e) {
-            System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
-        }
+        } catch(Exception e){
+                System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
+            }
     }
 
     @Operation(
