@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/files/uploads/**").permitAll()
                         .requestMatchers("/api/files/upload").permitAll()
+                        .requestMatchers("/api/files/upload-chunk").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

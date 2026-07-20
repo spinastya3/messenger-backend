@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -127,6 +128,51 @@ public class FileController {
         return ResponseEntity.status(PARTIAL_CONTENT)
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(region);
+    }
+
+    @PostMapping("/upload-chunk")
+    public ResponseEntity<?> uploadChunk(
+            @RequestParam("file") MultipartFile chunk,
+            @RequestParam("fileName") String fileName,
+            @RequestParam("chunkIndex") int chunkIndex,
+            @RequestParam("isLast") boolean isLast) {
+
+        try {
+            // Путь к вечной папке на диске Амверы
+            String uploadDir = "/data/uploads/";
+            File dir = new File(uploadDir);
+            if (!dir.exists()) dir.mkdirs();
+
+            // Временный файл для конкретного кусочка (например, video_123.mp4.part0)
+            File chunkFile = new File(uploadDir + fileName + ".part" + chunkIndex);
+            chunk.transferTo(chunkFile);
+
+            // Если это последний кусок — запускаем конвейер склейки!
+            if (isLast) {
+                File finalFile = new File(uploadDir + fileName);
+                try (FileOutputStream fos = new FileOutputStream(finalFile, true)) {
+                    // Последовательно собираем все кусочки по их номерам
+                    for (int i = 0; i <= chunkIndex; i++) {
+                        File currentChunk = new File(uploadDir + fileName + ".part" + i);
+                        if (currentChunk.exists()) {
+                            java.nio.file.Files.copy(currentChunk.toPath(), fos);
+                            currentChunk.delete(); // Сразу удаляем мусорный кусочек с диска!
+                        }
+                    }
+                }
+
+                // Возвращаем привычный для Андроида формат ссылки
+                String fileDownloadUrl = "/uploads/" + fileName;
+                return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
+            }
+
+            // Если это промежуточный кусок - просто говорим Андроиду "Жду следующий!"
+            return ResponseEntity.ok(Map.of("status", "chunk_saved", "index", chunkIndex));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Ошибка склейки чанка: " + e.getMessage());
+        }
     }
 }
 
