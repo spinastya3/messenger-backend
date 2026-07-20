@@ -10,7 +10,6 @@ import java.io.File;
 @EnableScheduling
 public class MediaCleanupScheduler {
 
-    // Вечный диск Амверы
     private static final String UPLOAD_DIR = "/data/uploads/";
     private static final long THREE_DAYS_MS = 3L * 24 * 60 * 60 * 1000;
 
@@ -23,7 +22,6 @@ public class MediaCleanupScheduler {
         int deletedCount = 0;
         long now = System.currentTimeMillis();
 
-        // 🚀 РЕШЕНИЕ: Сканируем и корень папки, и заглядываем внутрь всех её подпапок (photos/videos)!
         deletedCount += scanAndCleanup(baseFolder, now);
 
         if (deletedCount > 0) {
@@ -31,7 +29,6 @@ public class MediaCleanupScheduler {
         }
     }
 
-    // Рекурсивный снайперский метод: чистит файлы везде, где найдёт
     private int scanAndCleanup(File folder, long now) {
         File[] files = folder.listFiles();
         if (files == null) return 0;
@@ -40,10 +37,8 @@ public class MediaCleanupScheduler {
 
         for (File file : files) {
             if (file.isDirectory()) {
-                // Если наткнулись на подпапку (photos или videos) — ныряем внутрь неё!
                 count += scanAndCleanup(file, now);
             } else if (file.isFile()) {
-                // 🚀 ИСПРАВИЛИ ТУТ: Используем lastModified() — он железно работает и на Windows, и в Docker на Linux!
                 long fileTime = file.lastModified();
 
                 if (now - fileTime > THREE_DAYS_MS) {
