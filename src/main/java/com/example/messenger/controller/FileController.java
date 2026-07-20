@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -150,20 +151,26 @@ public class FileController {
             // Если это последний кусок — запускаем конвейер склейки!
             if (isLast) {
                 File finalFile = new File(uploadDir + fileName);
-                try (FileOutputStream fos = new FileOutputStream(finalFile, true)) {
-                    // Последовательно собираем все кусочки по их номерам
+                try (FileOutputStream fos = new FileOutputStream(finalFile, true)) { // Флаг true - строго дописываем в конец!
+                    byte[] buffer = new byte[65536]; // Порциями по 64 КБ
+
                     for (int i = 0; i <= chunkIndex; i++) {
                         File currentChunk = new File(uploadDir + fileName + ".part" + i);
                         if (currentChunk.exists()) {
-                            java.nio.file.Files.copy(currentChunk.toPath(), fos);
-                            currentChunk.delete(); // Сразу удаляем мусорный кусочек с диска!
+                            try (FileInputStream fis = new FileInputStream(currentChunk)) {
+                                int bytesRead;
+                                while ((bytesRead = fis.read(buffer)) != -1) {
+                                    fos.write(buffer, 0, bytesRead);
+                                }
+                            }
+                            currentChunk.delete(); // Сразу удаляем мусорный кусочек с диска Амверы!
                         }
                     }
                 }
 
-                // Возвращаем привычный для Андроида формат ссылки
                 String fileDownloadUrl = "/uploads/" + fileName;
                 return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
+
             }
 
             // Если это промежуточный кусок - просто говорим Андроиду "Жду следующий!"
