@@ -27,7 +27,11 @@ public class Message {
     private String imageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = true)
+    @Column(
+            name = "status",
+            nullable = true,
+            columnDefinition = "VARCHAR(255) CHECK (status IN ('SENT', 'DELIVERED', 'READ'))"
+    )
     private MessageStatus status = MessageStatus.SENT;
 
     public MessageStatus getStatus() {
