@@ -27,8 +27,15 @@ public class Message {
     private String imageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private MessageStatus status = MessageStatus.SENT;
+
+    public MessageStatus getStatus() {
+        if (this.status == null) {
+            return MessageStatus.SENT;
+        }
+        return this.status;
+    }
 
     // Эти методы Джексон автоматически превратит в ключи "senderId" и "senderName" на верхнем уровне JSON!
     @JsonProperty("senderId")

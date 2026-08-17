@@ -1,4 +1,4 @@
-package com.example.messenger.repository; // 🟢 Проверь свой пакет!
+package com.example.messenger.repository;
 
 import com.example.messenger.model.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,7 +20,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Long> findActiveChatBuddyIds(@Param("userId") Long userId);
 
     @Query("SELECT m FROM Message m WHERE m.sender.id = :sId AND m.recipient.id = :rId " +
-            "AND m.status = com.example.messenger.model.MessageStatus.SENT")
+            "AND (m.status = com.example.messenger.model.MessageStatus.SENT OR m.status IS NULL)")
     List<Message> findUnreadMessages(@Param("sId") Long senderId, @Param("rId") Long recipientId);
 }
 
