@@ -1,6 +1,7 @@
 package com.example.messenger.controller;
 
 import com.example.messenger.PushNotificationService;
+import com.example.messenger.model.MessageStatus;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.model.Message;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -39,6 +41,9 @@ public class MessageController {
 
         // Записываем время на сервере в сообщение
         message.setTimestamp(LocalDateTime.now());
+
+        // Ставим статус SENT в БД для нового сообщения
+        message.setStatus(MessageStatus.SENT);
 
         // Сохраняем сообщение в БД
         Message savedMessage = messageRepository.save(message);
@@ -98,6 +103,40 @@ public class MessageController {
                 System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
             }
     }
+
+    @MessageMapping("/chat.read")
+    @Operation(
+            summary = " [WebSocket STOMP] Отметить сообщения от собеседника как прочитанные",
+            description = "Вызывается клиентом через WebSocket при открытии чата. Массово переводит входящие сообщения от указанного отправителя в статус READ и отправляет событие-оповещение в топик /topic/messages.read.{senderId}"
+    )
+    public void readMessages(@Payload Map<String, Long> payload) {
+        Long senderId = payload.get("senderId");
+        Long recipientId = payload.get("recipientId");
+
+        if (senderId == null || recipientId == null) return;
+
+        // Находим в БД все сообщения, которые отправил этот собеседник и которые еще не прочитаны
+        List<Message> unreadMessages = messageRepository.findUnreadMessages(senderId, recipientId);
+
+        if (!unreadMessages.isEmpty()) {
+            // Массово переводим их в статус READ
+            for (Message msg : unreadMessages) {
+                msg.setStatus(MessageStatus.READ);
+            }
+            // Сохраняем пачку обновленных сообщений в БД
+            messageRepository.saveAll(unreadMessages);
+
+            // Шлем в канал отправителя список ID сообщений, которые стали прочитанными
+            messagingTemplate.convertAndSend("/topic/messages.read." + senderId, Map.of(
+                    "status", "READ",
+                    "readerId", recipientId,
+                    "senderId", senderId
+            ));
+
+            System.out.println("👥 Пользователь " + recipientId + " прочитал сообщения от " + senderId + ". Статус обновлен!");
+        }
+    }
+
 
     @Operation(
             summary = "Получить историю переписки между двумя пользователями",

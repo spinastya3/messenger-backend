@@ -1,6 +1,6 @@
-package com.example.messenger.model; // 🟢 Твой бэкенд-пакет!
+package com.example.messenger.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty; // 🔥 НАШ КЛЮЧЕВОЙ ИМПОРТ!
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -25,6 +25,10 @@ public class Message {
     private String content;
     private LocalDateTime timestamp;
     private String imageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private MessageStatus status = MessageStatus.SENT;
 
     // Эти методы Джексон автоматически превратит в ключи "senderId" и "senderName" на верхнем уровне JSON!
     @JsonProperty("senderId")

@@ -11,6 +11,7 @@ import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,7 +43,7 @@ public class FileController {
             @ApiResponse(responseCode = "400", description = "Некорректный запрос: передан пустой файл или неверный формат"),
             @ApiResponse(responseCode = "500", description = "Ошибка сервера: не удалось физически записать файл на диск Амверы")
     })
-    // 🥷 УЛЬТИМАТИВНЫЙ СИНТАКСИС: Сваггер нарисует интерактивную кнопку «Choose File» для выбора картинок мышкой!
+
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -65,11 +66,21 @@ public class FileController {
             // 🚀 Сохраняем бинарный файл на диск Амверы!
             file.transferTo(destFile);
 
-            String prefix = uniqueFileName.toLowerCase().endsWith(".mp4") ? "/uploads/videos/" : "/uploads/photos/";
-            String fileDownloadUrl = prefix + uniqueFileName;
+            String currentDomain = ServletUriComponentsBuilder
+                    .fromCurrentContextPath()
+                    .build()
+                    .toUriString();
+
+            if (currentDomain.startsWith("http://") && !currentDomain.contains("localhost")) {
+                currentDomain = currentDomain.replace("http://", "https://");
+            }
+
+            String fullDownloadUrl = currentDomain + "/api/files/uploads/photos/" + uniqueFileName;
+            // String prefix = uniqueFileName.toLowerCase().endsWith(".mp4") ? "/uploads/videos/" : "/uploads/photos/";
+            //String fileDownloadUrl = prefix + uniqueFileName;
 
             // Возвращаем JSON (imageUrl подхватит и полная ссылка на мобилке)
-            return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
+            return ResponseEntity.ok(Map.of("imageUrl", fullDownloadUrl));
 
         } catch (IOException e) {
             return ResponseEntity
@@ -94,7 +105,7 @@ public class FileController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(resource);
     }
-    // 📡 МУЛЬТИМЕДИЙНЫЙ ШЛЮЗ РАЗДАЧИ: Теперь ExoPlayer сможет читать видео кусочками (Range-запросы)!
+
     @GetMapping("/uploads/videos/{filename:.+}")
     public ResponseEntity<ResourceRegion> getVideo(
             @PathVariable String filename,
@@ -168,11 +179,30 @@ public class FileController {
                     }
                 }
 
-                String fileDownloadUrl = "/uploads/" + fileName;
-                return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
+//                String fileDownloadUrl = "/uploads/" + fileName;
+//                return ResponseEntity.ok(Map.of("imageUrl", fileDownloadUrl));
+//
+//            }
+//
+//            return ResponseEntity.ok(Map.of("status", "chunk_saved", "index", chunkIndex));
+                // 🚀 СЕКРЕТ ЧИСТОЙ ССЫЛКИ: Спринг сам берет твой домен Амверы (https://amvera.ru)
+                String currentDomain = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                        .fromCurrentContextPath()
+                        .build()
+                        .toUriString();
 
+                // Принудительно делаем https для Амверы в продакшене (локальный localhost на ПК не трогаем)
+                if (currentDomain.startsWith("http://") && !currentDomain.contains("localhost")) {
+                    currentDomain = currentDomain.replace("http://", "https://");
+                }
+
+                // Собираем ПОЛНЫЙ путь, который точь-в-точь совпадает с твоей ручкой @GetMapping("/uploads/videos/...")
+                String fullAbsoluteVideoUrl = currentDomain + "/api/files/uploads/videos/" + fileName;
+
+                System.out.println("🟩 Видео успешно склеено! Выдаем чистый URL: " + fullAbsoluteVideoUrl);
+                // Возвращаем на мобилку красивую абсолютную ссылку
+                return ResponseEntity.ok(Map.of("imageUrl", fullAbsoluteVideoUrl));
             }
-
             return ResponseEntity.ok(Map.of("status", "chunk_saved", "index", chunkIndex));
 
         } catch (Exception e) {
