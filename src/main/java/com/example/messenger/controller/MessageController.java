@@ -33,6 +33,9 @@ public class MessageController {
     @MessageMapping("/chat.send")
     public void processMessage(@Payload Message message) {
 
+        System.out.println("🔍 [ДО СОХРАНЕНИЯ] Ссылка от мобилки: " + message.getImageUrl());
+
+
         // Записываем время на сервере в сообщение
         message.setTimestamp(LocalDateTime.now());
 
@@ -41,6 +44,9 @@ public class MessageController {
 
         // Сохраняем сообщение в БД
         Message savedMessage = messageRepository.save(message);
+
+        System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + savedMessage.getImageUrl());
+
 
         // Шлем получателю (он поймает его и сразу ответит серверу, что оно доставлено)
         if (savedMessage.getRecipient() != null && savedMessage.getRecipient().getId() != null) {
