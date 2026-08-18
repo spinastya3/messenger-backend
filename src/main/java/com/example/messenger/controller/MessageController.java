@@ -133,18 +133,45 @@ public class MessageController {
     }
 
     // 3. Сюда Android шлет сигнал, когда пользователь открыл экран чата
+//    @MessageMapping("/chat.read")
+//    @Operation(
+//            summary = " [WebSocket STOMP] Отметить сообщения от собеседника как прочитанные",
+//            description = "Вызывается клиентом через WebSocket при открытии чата. Массово переводит входящие сообщения от указанного отправителя в статус READ и отправляет событие-оповещение в топик статусов отправителя."
+//    )
+//    public void readMessages(@Payload Map<String, Long> payload) {
+//        Long senderId = payload.get("senderId"); // Тот, чей чат мы открыли
+//        Long recipientId = payload.get("recipientId"); // Мы (кто прочитал)
+//
+//        if (senderId == null || recipientId == null) return;
+//
+//        // Находим все непрочитанные (и SENT, и DELIVERED через твой обновленный метод)
+//        List<Message> unreadMessages = messageRepository.findUnreadMessages(senderId, recipientId);
+//
+//        if (!unreadMessages.isEmpty()) {
+//            for (Message msg : unreadMessages) {
+//                msg.setStatus(MessageStatus.READ);
+//            }
+//            messageRepository.saveAll(unreadMessages);
+//
+//            // Оповещаем ОТПРАВИТЕЛЯ в тот же топик статусов
+//            messagingTemplate.convertAndSend("/topic/messages.status." + senderId, Map.of(
+//                    "status", "READ",
+//                    "recipientId", recipientId,
+//                    "senderId", senderId
+//            ));
+//
+//            System.out.println("👥 Пользователь " + recipientId + " прочитал сообщения от " + senderId + ". Статус: READ");
+//        }
+//    }
+
     @MessageMapping("/chat.read")
-    @Operation(
-            summary = " [WebSocket STOMP] Отметить сообщения от собеседника как прочитанные",
-            description = "Вызывается клиентом через WebSocket при открытии чата. Массово переводит входящие сообщения от указанного отправителя в статус READ и отправляет событие-оповещение в топик статусов отправителя."
-    )
     public void readMessages(@Payload Map<String, Long> payload) {
-        Long senderId = payload.get("senderId"); // Тот, чей чат мы открыли
-        Long recipientId = payload.get("recipientId"); // Мы (кто прочитал)
+        Long senderId = payload.get("senderId");
+        Long recipientId = payload.get("recipientId");
 
         if (senderId == null || recipientId == null) return;
 
-        // Находим все непрочитанные (и SENT, и DELIVERED через твой обновленный метод)
+        // Ищем непрочитанные в базе
         List<Message> unreadMessages = messageRepository.findUnreadMessages(senderId, recipientId);
 
         if (!unreadMessages.isEmpty()) {
@@ -152,16 +179,19 @@ public class MessageController {
                 msg.setStatus(MessageStatus.READ);
             }
             messageRepository.saveAll(unreadMessages);
-
-            // Оповещаем ОТПРАВИТЕЛЯ в тот же топик статусов
-            messagingTemplate.convertAndSend("/topic/messages.status." + senderId, Map.of(
-                    "status", "READ",
-                    "recipientId", recipientId,
-                    "senderId", senderId
-            ));
-
-            System.out.println("👥 Пользователь " + recipientId + " прочитал сообщения от " + senderId + ". Статус: READ");
+            System.out.println("👥 [БАЗА] Статусы сообщений обновлены в READ для юзера " + recipientId);
         }
+
+        // 🔥 ИСПРАВЛЕНО: Выносим отправку в сокет СТРОГО за пределы условия if!
+        // Даже если база данных притормозила, мы ВСЁ РАВНО шлем отправителю сигнал:
+        // "Собеседник сейчас в чате, включай две салатовые галочки в прямом эфире!"
+        messagingTemplate.convertAndSend("/topic/messages.status." + senderId, Map.of(
+                "status", "READ",
+                "recipientId", recipientId,
+                "senderId", senderId
+        ));
+
+        System.out.println("🚀 [СОКЕТ] Сигнал READ успешно отправлен в топик /topic/messages.status." + senderId);
     }
 
     @GetMapping("/api/chat/history")
