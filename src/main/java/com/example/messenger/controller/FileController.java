@@ -75,12 +75,23 @@ public class FileController {
                 currentDomain = currentDomain.replace("http://", "https://");
             }
 
-            String fullDownloadUrl = currentDomain + "/api/files/uploads/photos/" + uniqueFileName;
+            String prefix = uniqueFileName.toLowerCase().endsWith(".mp4") ? "/uploads/videos/" : "/uploads/photos/";
+
+            // Склеиваем всё в одну идеальную абсолютную ссылку
+            String fullDownloadUrl = currentDomain + "/api/files" + prefix + uniqueFileName;
+
+            System.out.println("🟩 Файл успешно сохранен! Ссылка для мобилки: " + fullDownloadUrl);
+
+            // Возвращаем JSON с правильным URL (теперь и для фото, и для видео)
+            return ResponseEntity.ok(Map.of("imageUrl", fullDownloadUrl));
+
+
+           // String fullDownloadUrl = currentDomain + "/api/files/uploads/photos/" + uniqueFileName;
             // String prefix = uniqueFileName.toLowerCase().endsWith(".mp4") ? "/uploads/videos/" : "/uploads/photos/";
             //String fileDownloadUrl = prefix + uniqueFileName;
 
             // Возвращаем JSON (imageUrl подхватит и полная ссылка на мобилке)
-            return ResponseEntity.ok(Map.of("imageUrl", fullDownloadUrl));
+            //return ResponseEntity.ok(Map.of("imageUrl", fullDownloadUrl));
 
         } catch (IOException e) {
             return ResponseEntity
