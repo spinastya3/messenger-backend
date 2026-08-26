@@ -5,11 +5,15 @@ import com.example.messenger.model.Message;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
+import com.example.messenger.service.MessageService;
+import com.example.messenger.service.PushNotificationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
@@ -19,6 +23,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,22 +31,55 @@ import static org.mockito.Mockito.when;
 public class MessageControllerTests {
 
 
-    @InjectMocks
     private MessageController messageController;
+
+    // Оставляем обычные чистые заглушки @Mock для всех зависимостей контроллера
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @Mock
     private MessageRepository messageRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private UserRepository userRepository;
 
     @Mock
-    private UserRepository userRepository; // 🟢 Заглушка для базы юзеров
+    private PushNotificationService pushNotificationService;
 
     @Mock
-    private PushNotificationService pushNotificationService; // 🟢 Заглушка для пушей
+    private MessageService messageService; // Наш новый сервис
 
-    Message testMessage = new Message();
+    // 🚀 ШАГ 2: ДОБАВЛЯЕМ СТАНДАРТНЫЙ МЕТОД ИНИЦИАЛИЗАЦИИ ВРУЧНУЮ!
+    // Не забудьте импортировать: import org.junit.jupiter.api.BeforeEach;
+    @BeforeEach
+    public void setUp() {
+        // Жестко и принудительно передаем ВСЕ моки в конструктор контроллера по порядку.
+        // Теперь ни одно поле (включая messagingTemplate) никогда не будет null!
+        messageController = new MessageController(
+                messagingTemplate,
+                messageRepository,
+                userRepository,
+                pushNotificationService,
+                messageService
+        );
+    }
+
+//    @InjectMocks
+//    private MessageController messageController;
+//
+//    @Mock
+//    private MessageRepository messageRepository;
+//
+//    @Mock
+//    private UserRepository userRepository;
+//
+//    @Mock
+//    private PushNotificationService pushNotificationService;
+//
+//    @Mock
+//    private MessageService messageService;
+//
+   Message testMessage = new Message();
 
  @Test
  public void chatHistoryTest() {
@@ -58,17 +96,16 @@ public class MessageControllerTests {
 
      List<Message> testHistory = List.of(testMessage);
 
-     when(messageRepository.findChatHistory(testSenderId, testRecipientId))
+     when(messageService.getChatHistory(eq(testSenderId), eq(testRecipientId), eq(0), eq(20)))
              .thenReturn(testHistory);
 
-     List<Message> result = (List<Message>) messageController.getChatHistory(testSenderId, testRecipientId).getBody();
+     List<Message> result = (List<Message>) messageController.getChatHistory(testSenderId, testRecipientId, 0, 20).getBody();
 
      assertAll("Проверка выгрузки истории чата",
              () -> assertEquals(1, result.size(), "В истории не одно сообщение"),
              () -> assertEquals("Проверка связи", result.getFirst().getContent(), "Текст не совпадает"),
              () -> assertEquals(expectedTime, result.getFirst().getTimestamp(), "Время сообщения не совпадает со временем в БД")
      );
-
  }
 
     @Test
@@ -119,17 +156,30 @@ public class MessageControllerTests {
         incomingMessage.setRecipient(recipientUser);
         incomingMessage.setContent("гермиона, привет! Пуши работают?");
 
-        // 4. Обучаем Мокито
-        when(messageRepository.save(any(Message.class))).then(returnsFirstArg());
-        when(userRepository.findById(20L)).thenReturn(Optional.of(databaseRecipient));
-        when(userRepository.findById(10L)).thenReturn(Optional.of(senderUser));
+        // 🚀 ИСПРАВЛЕНИЕ МАТЧЕРОВ: Если в одном месте Mockito используется any(),
+        // то ВСЕ остальные аргументы в соседних when ОБЯЗАНЫ быть обернуты в eq()!
+        // Иначе Mockito выкидывает InvalidUseOfMatchersException.
+        // Не забудьте импорты: import static org.mockito.ArgumentMatchers.any;
+        //                     import static org.mockito.ArgumentMatchers.eq;
+        when(messageRepository.save(any(Message.class))).then(org.mockito.AdditionalAnswers.returnsFirstArg());
+        when(userRepository.findById(eq(20L))).thenReturn(Optional.of(databaseRecipient));
+        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));
 
-        // 5. Делаем выстрел в контроллер!
+        // 4. Делаем выстрел в контроллер!
         messageController.processMessage(incomingMessage);
 
-        // 6. QA-Проверка: если тест дошел до конца и не выкинул ошибок —
+        // 5. QA-Проверка: если тест дошел до конца и не выкинул ошибок —
         // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
         assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
+
+        // Тут тоже жестко фиксируем через eq()
         verify(pushNotificationService)
-                .sendPushNotification("real_fcm_token_666", "гарри", "гермиона, привет! Пуши работают?", 10L, "гарри");    }
+                .sendPushNotification(
+                        eq("real_fcm_token_666"),
+                        eq("гарри"),
+                        eq("гермиона, привет! Пуши работают?"),
+                        eq(10L),
+                        eq("гарри")
+                );
+    }
 }

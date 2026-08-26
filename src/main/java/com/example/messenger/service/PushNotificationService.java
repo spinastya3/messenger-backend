@@ -1,4 +1,4 @@
-package com.example.messenger;
+package com.example.messenger.service;
 
 import com.google.firebase.messaging.*;
 import org.springframework.stereotype.Service;
