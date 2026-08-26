@@ -40,37 +40,54 @@ public class MessageController {
 
         System.out.println("🔍 [ДО СОХРАНЕНИЯ] Ссылка от мобилки: " + message.getImageUrl());
 
+        // 🛡️ ЗАЩИТА ОТ PSQLException: Вытаскиваем живых юзеров из базы
+        if (message.getSender() != null && message.getSender().getId() != null) {
+            User realSender = userRepository.findById(message.getSender().getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Отправитель не найден в БД"));
+            message.setSender(realSender);
+        }
+
+        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+            User realRecipient = userRepository.findById(message.getRecipient().getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Получатель не найден в БД"));
+            message.setRecipient(realRecipient);
+        }
+
         // Записываем время на сервере в сообщение
         message.setTimestamp(LocalDateTime.now());
 
         // Ставим статус SENT в БД для нового сообщения
         message.setStatus(MessageStatus.SENT);
 
+        // 🚀 ИДЕАЛЬНОЕ СИММЕТРИЧНОЕ ШИФРОВАНИЕ ДЛЯ БАЗЫ:
         if (message.getContent() != null) {
-            String encryptedText = encryptionUtil.encrypt(message.getContent());
-            message.setContent(encryptedText);
+            // 1. Сохраняем чистый исходный текст в локальную переменную
+            String clearText = message.getContent();
+
+            // 2. Шифруем и кладём в объект для базы данных
+            message.setContent(encryptionUtil.encrypt(clearText));
+            messageRepository.save(message); // В БД улетает зашифрованный бред!
+
+            // 3. МГНОВЕННО ВОЗВРАЩАЕМ ЧИСТЫЙ ТЕКСТ ОБЪЕКТУ В ПАМЯТИ!
+            // Теперь объект message снова несёт нормальный чистый текст
+            message.setContent(clearText);
+        } else {
+            // Если это фото или видео без текста — просто сохраняем как есть
+            messageRepository.save(message);
         }
 
-        // Сохраняем сообщение в БД
-        Message savedMessage = messageRepository.save(message);
+        System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + message.getImageUrl());
 
-        System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + savedMessage.getImageUrl());
-
-        // Шлем получателю (он поймает его и сразу ответит серверу, что оно доставлено)
-        if (savedMessage.getRecipient() != null && savedMessage.getRecipient().getId() != null) {
-            messagingTemplate.convertAndSend("/topic/messages." + savedMessage.getRecipient().getId(), savedMessage);
+        // 🚀 ОТПРАВКА ПО СОКЕТАМ: Везде заменили savedMessage на чистый message!
+        // Шлем получателю (он поймает его с чистым текстом)
+        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+            messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
         }
 
-        // Шлем обратно отправителю (чтобы на экране появилась первая галочка)
-        if (savedMessage.getSender() != null && savedMessage.getSender().getId() != null) {
-            messagingTemplate.convertAndSend("/topic/messages." + savedMessage.getSender().getId(), savedMessage);
+        // Шлем обратно отправителю (чтобы синее облачко на эмуляторе отобразило чистый текст и галочку)
+        if (message.getSender() != null && message.getSender().getId() != null) {
+            messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
         }
-
-        if (savedMessage.getContent() != null) {
-            String decryptedText = encryptionUtil.decrypt(savedMessage.getContent());
-            savedMessage.setContent(decryptedText);
-        }
-
         // Шлём пуш-уведомление
         try {
             User recipient = message.getRecipient();

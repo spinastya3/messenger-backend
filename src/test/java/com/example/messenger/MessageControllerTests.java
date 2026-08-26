@@ -137,6 +137,7 @@ public class MessageControllerTests {
                         "Тайминг сообщения не должен превышать текущее время")
         );
     }
+
     @Test
     public void shouldSendPushNotificationWhenMessageArrives() {
         // 1. Готовим отправителя
@@ -161,12 +162,11 @@ public class MessageControllerTests {
         incomingMessage.setRecipient(recipientUser);
         incomingMessage.setContent("гермиона, привет! Пуши работают?");
 
+        // 🚀 ОБУЧАЕМ ТОЛЬКО ШИФРОВАЛЬЩИК (Дешифратор стёрли, чтобы Mockito не ругался на UnnecessaryStubbing!)
         when(encryptionUtil.encrypt(eq("гермиона, привет! Пуши работают?")))
                 .thenReturn("ENCRYPTED_TEXT");
 
-        // Говорим моку: когда контроллер перед пушами попросит расшифровать обратно, верни исходный текст!
-        when(encryptionUtil.decrypt(eq("ENCRYPTED_TEXT")))
-                .thenReturn("гермиона, привет! Пуши работают?");
+        // Заглушки репозиториев и баз данных
         when(messageRepository.save(any(Message.class))).then(org.mockito.AdditionalAnswers.returnsFirstArg());
         when(userRepository.findById(eq(20L))).thenReturn(Optional.of(databaseRecipient));
         when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));
@@ -174,11 +174,10 @@ public class MessageControllerTests {
         // 4. Делаем выстрел в контроллер!
         messageController.processMessage(incomingMessage);
 
-        // 5. QA-Проверка: если тест дошел до конца и не выкинул ошибок —
-        // значит, вся цепочка поиска токена и вызова сервиса Firebase отработала штатно!
+        // 5. QA-Проверка
         assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
 
-        // Тут тоже жестко фиксируем через eq()
+        // Проверяем, что пуш улетает с КРАСИВЫМ чистым текстом, а не кракозябрами!
         verify(pushNotificationService)
                 .sendPushNotification(
                         eq("real_fcm_token_666"),
