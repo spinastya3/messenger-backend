@@ -11,6 +11,7 @@ import com.example.messenger.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.AdditionalAnswers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -68,22 +69,6 @@ public class MessageControllerTests {
                 encryptionUtil
         );
     }
-
-//    @InjectMocks
-//    private MessageController messageController;
-//
-//    @Mock
-//    private MessageRepository messageRepository;
-//
-//    @Mock
-//    private UserRepository userRepository;
-//
-//    @Mock
-//    private PushNotificationService pushNotificationService;
-//
-//    @Mock
-//    private MessageService messageService;
-//
    Message testMessage = new Message();
 
  @Test
@@ -115,15 +100,40 @@ public class MessageControllerTests {
 
     @Test
     public void processMessage_ShouldSetCurrentTimestampAndSave() {
+        // 1. Готовим тестовых пользователей с ID (чтобы контроллер прошел валидацию)
+        User senderUser = new User();
+        senderUser.setId(10L);
+        senderUser.setUsername("гарри");
 
-        testMessage.setContent("Проверяем время");
+        User recipientUser = new User();
+        recipientUser.setId(20L);
+        recipientUser.setUsername("гермиона");
+
+        // 2. Настраиваем сообщение
+        Message localTestMessage = new Message();
+        localTestMessage.setSender(senderUser);
+        localTestMessage.setRecipient(recipientUser);
+        localTestMessage.setContent("Проверяем время");
+
+        // 🚀 ОБУЧАЕМ МОКИТО (Защита от падений репозиториев и шифрования):
+        // Разрешаем контроллеру успешно найти Гарри и Гермиону в базе данных
+        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));
+        when(userRepository.findById(eq(20L))).thenReturn(Optional.of(recipientUser));
+
+        // Обучаем шифровальщик возвращать тестовую строку, чтобы не было NullPointerException
+        when(encryptionUtil.encrypt(eq("Проверяем время"))).thenReturn("ENCRYPTED_TEXT");
+
+        // Стандартная заглушка сохранения репозитория
+        when(messageRepository.save(any(Message.class))).then(AdditionalAnswers.returnsFirstArg());
 
         LocalDateTime testStartTime = java.time.LocalDateTime.now().minusSeconds(1);
-        when(messageRepository.save(any(Message.class))).then(returnsFirstArg());
-        messageController.processMessage(testMessage);
 
-        LocalDateTime messageTime = testMessage.getTimestamp();
+        // 3. Делаем выстрел в контроллер!
+        messageController.processMessage(localTestMessage);
 
+        LocalDateTime messageTime = localTestMessage.getTimestamp();
+
+        // 4. Проверки
         assertAll("Проверка генерации живого тайминга при отправке",
                 // 🕵️‍♂️ Проверяем, что поле времени вообще заполнилось
                 () -> assertNotNull(messageTime, "Сервер обязан сгенерировать timestamp!"),
@@ -133,7 +143,7 @@ public class MessageControllerTests {
                         "Тайминг сообщения должен быть актуальным (создан только что)"),
 
                 // 🕵️‍♂️ Проверяем диапазон: время сообщения не должно улететь в далекое будущее
-                () -> assertTrue(messageTime.isBefore(java.time.LocalDateTime.now().plusSeconds(1)),
+                () -> assertTrue(messageTime.isBefore(LocalDateTime.now().plusSeconds(1)),
                         "Тайминг сообщения не должен превышать текущее время")
         );
     }
