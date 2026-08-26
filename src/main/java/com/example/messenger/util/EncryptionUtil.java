@@ -12,14 +12,13 @@ public class EncryptionUtil {
 
     private static final String ALGORITHM = "AES";
 
-    private static String secretKey;
-
     @Value("${app.security.encryption-key}")
-    public void setSecretKey(String key) {
-        EncryptionUtil.secretKey = key;
-    }
+    private String secretKey;
 
-    public static String encrypt(String plainText) {
+    /**
+     * 🔒 ЗАШИФРОВАТЬ ТЕКСТ
+     */
+    public String encrypt(String plainText) {
         if (plainText == null || plainText.isEmpty()) return plainText;
         try {
             SecretKeySpec keySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), ALGORITHM);
@@ -37,10 +36,9 @@ public class EncryptionUtil {
     /**
      * 🔓 РАСШИФРОВАТЬ ТЕКСТ
      */
-    public static String decrypt(String encryptedText) {
+    public String decrypt(String encryptedText) {
         if (encryptedText == null || encryptedText.isEmpty()) return encryptedText;
         try {
-            // 🚀 ИСПРАВЛЕНИЕ ТУТ ТОЖЕ: Перевели в нижний регистр secretKey!
             SecretKeySpec keySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), ALGORITHM);
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.DECRYPT_MODE, keySpec);
@@ -48,7 +46,6 @@ public class EncryptionUtil {
             byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            // Если текст не был зашифрован, утилита вернет его как есть
             return encryptedText;
         }
     }

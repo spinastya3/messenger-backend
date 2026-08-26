@@ -7,6 +7,7 @@ import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.service.MessageService;
 import com.example.messenger.service.PushNotificationService;
+import com.example.messenger.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,7 +48,10 @@ public class MessageControllerTests {
     private PushNotificationService pushNotificationService;
 
     @Mock
-    private MessageService messageService; // Наш новый сервис
+    private MessageService messageService;
+
+    @Mock
+    private EncryptionUtil encryptionUtil;
 
     // 🚀 ШАГ 2: ДОБАВЛЯЕМ СТАНДАРТНЫЙ МЕТОД ИНИЦИАЛИЗАЦИИ ВРУЧНУЮ!
     // Не забудьте импортировать: import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +64,8 @@ public class MessageControllerTests {
                 messageRepository,
                 userRepository,
                 pushNotificationService,
-                messageService
+                messageService,
+                encryptionUtil
         );
     }
 
@@ -156,11 +161,12 @@ public class MessageControllerTests {
         incomingMessage.setRecipient(recipientUser);
         incomingMessage.setContent("гермиона, привет! Пуши работают?");
 
-        // 🚀 ИСПРАВЛЕНИЕ МАТЧЕРОВ: Если в одном месте Mockito используется any(),
-        // то ВСЕ остальные аргументы в соседних when ОБЯЗАНЫ быть обернуты в eq()!
-        // Иначе Mockito выкидывает InvalidUseOfMatchersException.
-        // Не забудьте импорты: import static org.mockito.ArgumentMatchers.any;
-        //                     import static org.mockito.ArgumentMatchers.eq;
+        when(encryptionUtil.encrypt(eq("гермиона, привет! Пуши работают?")))
+                .thenReturn("ENCRYPTED_TEXT");
+
+        // Говорим моку: когда контроллер перед пушами попросит расшифровать обратно, верни исходный текст!
+        when(encryptionUtil.decrypt(eq("ENCRYPTED_TEXT")))
+                .thenReturn("гермиона, привет! Пуши работают?");
         when(messageRepository.save(any(Message.class))).then(org.mockito.AdditionalAnswers.returnsFirstArg());
         when(userRepository.findById(eq(20L))).thenReturn(Optional.of(databaseRecipient));
         when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));

@@ -31,6 +31,8 @@ public class MessageController {
     private final UserRepository userRepository; // Пользователи
     private final PushNotificationService pushNotificationService; // Пуши
     private final MessageService messageService; // Пагинация
+    private final EncryptionUtil encryptionUtil; // Шифрование сообщений
+
 
     // 1. Сюда приходят новые сообщения от отправителя
     @MessageMapping("/chat.send")
@@ -45,7 +47,7 @@ public class MessageController {
         message.setStatus(MessageStatus.SENT);
 
         if (message.getContent() != null) {
-            String encryptedText = EncryptionUtil.encrypt(message.getContent());
+            String encryptedText = encryptionUtil.encrypt(message.getContent());
             message.setContent(encryptedText);
         }
 
@@ -62,6 +64,11 @@ public class MessageController {
         // Шлем обратно отправителю (чтобы на экране появилась первая галочка)
         if (savedMessage.getSender() != null && savedMessage.getSender().getId() != null) {
             messagingTemplate.convertAndSend("/topic/messages." + savedMessage.getSender().getId(), savedMessage);
+        }
+
+        if (savedMessage.getContent() != null) {
+            String decryptedText = encryptionUtil.decrypt(savedMessage.getContent());
+            savedMessage.setContent(decryptedText);
         }
 
         // Шлём пуш-уведомление
