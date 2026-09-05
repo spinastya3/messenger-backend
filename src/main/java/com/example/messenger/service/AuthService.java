@@ -1,13 +1,13 @@
 package com.example.messenger.service;
 
+import com.example.messenger.crypto.CryptoHandshakeUtil;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
@@ -19,19 +19,24 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final EmailService emailService; // 📧 Подключаем почтовик!
+    private final EmailService emailService;
+    private final CryptoHandshakeUtil cryptoHandshakeUtil;
+
 
     private final Map<String, String> resetCodesCache = new ConcurrentHashMap<>();
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, EmailService emailService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil, EmailService emailService,
+                       CryptoHandshakeUtil cryptoHandshakeUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
+        this.cryptoHandshakeUtil = cryptoHandshakeUtil;
     }
 
     // Регистрируем пользователя, если логин уникальный
-    public Map<String, String> register(String username, String rawPassword, String email, String fcmToken) {
+    public Map<String, String> register(String username, String rawPassword, String email, String fcmToken,  String clientPublicKey) {
 
         Optional.ofNullable(username)
                 .filter(u -> !u.trim().isEmpty())
@@ -77,11 +82,17 @@ public class AuthService {
 
         emailService.sendWelcomeEmail(email, username);
 
-        return Map.of("message", "Поздравляю! Вы в ElisMessenger!");
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Поздравляю! Вы в ElisMessenger!");
+
+        // Вызываем утилиту рукопожатия
+        cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
+
+        return response;
     }
 
     // Авторизуем пользователя
-    public Map<String, String> login(String username, String rawPassword, String fcmToken) {
+    public Map<String, String> login(String username, String rawPassword, String fcmToken, String clientPublicKey) {
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с таким логином не найден!"));
@@ -95,11 +106,14 @@ public class AuthService {
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getId());
 
-        return Map.of(
-                "token", token,
-                "userId", String.valueOf(user.getId()),
-                "message", "С возвращением в ElisMessenger!"
-        );
+        Map<String, String> response = new HashMap<>();
+        response.put("token", token);
+        response.put("userId", String.valueOf(user.getId()));
+        response.put("message", "С возвращением в ElisMessenger!");
+
+        cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
+
+        return response;
     }
 
     // Запрашиваем изменение пароля
