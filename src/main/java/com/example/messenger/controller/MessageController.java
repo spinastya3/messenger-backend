@@ -40,12 +40,13 @@ public class MessageController {
     private final SessionKeyManager sessionKeyManager;
 
 
-    // 1. Сюда приходят новые сообщения от отправителя
+
     @MessageMapping("/chat.send")
     public void processMessage(@Payload Message message) {
 
         System.out.println("🔍 [ДО СОХРАНЕНИЯ] Ссылка от мобилки: " + message.getImageUrl());
 
+        // 🛡️ Валидация юзеров из БД
         if (message.getSender() != null && message.getSender().getId() != null) {
             User realSender = userRepository.findById(message.getSender().getId())
                     .orElseThrow(() -> new IllegalArgumentException("Отправитель не найден в БД"));
@@ -58,60 +59,69 @@ public class MessageController {
             message.setRecipient(realRecipient);
         }
 
-        // Записываем время на сервере в сообщение
         message.setTimestamp(LocalDateTime.now());
-
-        // Ставим статус SENT в БД для нового сообщения
         message.setStatus(MessageStatus.SENT);
 
         String clearText = "";
 
-        // 🚀 ИДЕАЛЬНОЕ СИММЕТРИЧНОЕ ШИФРОВАНИЕ ДЛЯ БАЗЫ:
         if (message.getContent() != null) {
-
             String senderUsername = message.getSender().getUsername();
             String recipientUsername = message.getRecipient().getUsername();
+
             String senderSessionKey = sessionKeyManager.getKey(senderUsername);
             String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
 
+            // 1. Расшифровываем входящий пакет от мобилки
             clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
 
+            // 2. Сохраняем в БД чистый текст (JPA-конвертер сам зашифрует его для диска)
             message.setContent(clearText);
             messageRepository.save(message);
+
+            // 3. Отправляем ПОЛУЧАТЕЛЮ персональный сетевой шифр
             if (recipientSessionKey != null) {
-                message.setContent(encryptionUtil.encrypt(clearText, recipientSessionKey));
+                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientSessionKey);
+
+                // Чтобы не портить оригинальный объект message по ссылке,
+                // временно подставляем шифр получателя, стреляем в сокет и сразу возвращаем чистый текст обратно!
+                message.setContent(encryptedForRecipient);
                 messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+                message.setContent(clearText); // Вернули чистый текст!
             }
 
+            // 4. Отправляем ОТПРАВИТЕЛЮ (эхо-подтверждение) его персональный сетевой шифр
             if (senderSessionKey != null) {
-                message.setContent(encryptionUtil.encrypt(clearText, senderSessionKey));
+                String encryptedForSender = encryptionUtil.encrypt(clearText, senderSessionKey);
+
+                message.setContent(encryptedForSender);
                 messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
+                message.setContent(clearText); // Вернули чистый текст!
             }
 
         } else {
-            // Если это фото или видео без текста — просто сохраняем как есть
+            // Если это медиафайл без текста — просто сохраняем и делаем стандартную сокет-рассылку
             messageRepository.save(message);
+
+            if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+            }
+            if (message.getSender() != null && message.getSender().getId() != null) {
+                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
+            }
         }
 
         System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + message.getImageUrl());
 
-        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
-            messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
-        }
+        // 🔥 СТАРЫЕ ДУБЛИРУЮЩИЕ СТРОКИ ОТПРАВКИ СОКЕТОВ ОТСЮДА ПОЛНОСТЬЮ УДАЛЕНЫ!
+        // Теперь на эмулятор никогда не прилетит второй вредоносный фрейм.
 
-        // Шлем обратно отправителю (чтобы синее облачко на эмуляторе отобразило чистый текст и галочку)
-        if (message.getSender() != null && message.getSender().getId() != null) {
-            messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
-        }
-        // Шлём пуш-уведомление
+        // 🚀 ЛОГИКА ПУШЕЙ (Здесь в переменной clearText гарантированно лежит красивый чистый текст!)
         try {
             User recipient = message.getRecipient();
-
             if (recipient != null) {
                 Optional<User> recipientFromDb = userRepository.findById(recipient.getId());
 
                 if (recipientFromDb.isPresent() && recipientFromDb.get().getFcmToken() != null) {
-
                     String targetToken = recipientFromDb.get().getFcmToken();
                     String senderName = "Пользователь";
 
@@ -123,6 +133,7 @@ public class MessageController {
 
                         String title = senderName;
                         String body = (clearText != null && !clearText.isEmpty()) ? clearText : message.getContent();
+
                         if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
                             if (body == null || body.trim().isEmpty()) {
                                 body = "Фотография";
@@ -143,6 +154,112 @@ public class MessageController {
             System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
         }
     }
+
+
+
+    // 1. Сюда приходят новые сообщения от отправителя
+//    @MessageMapping("/chat.send")
+//    public void processMessage(@Payload Message message) {
+//
+//        System.out.println("🔍 [ДО СОХРАНЕНИЯ] Ссылка от мобилки: " + message.getImageUrl());
+//
+//        if (message.getSender() != null && message.getSender().getId() != null) {
+//            User realSender = userRepository.findById(message.getSender().getId())
+//                    .orElseThrow(() -> new IllegalArgumentException("Отправитель не найден в БД"));
+//            message.setSender(realSender);
+//        }
+//
+//        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+//            User realRecipient = userRepository.findById(message.getRecipient().getId())
+//                    .orElseThrow(() -> new IllegalArgumentException("Получатель не найден в БД"));
+//            message.setRecipient(realRecipient);
+//        }
+//
+//        // Записываем время на сервере в сообщение
+//        message.setTimestamp(LocalDateTime.now());
+//
+//        // Ставим статус SENT в БД для нового сообщения
+//        message.setStatus(MessageStatus.SENT);
+//
+//        String clearText = "";
+//
+//        // 🚀 ИДЕАЛЬНОЕ СИММЕТРИЧНОЕ ШИФРОВАНИЕ ДЛЯ БАЗЫ:
+//        if (message.getContent() != null) {
+//
+//            String senderUsername = message.getSender().getUsername();
+//            String recipientUsername = message.getRecipient().getUsername();
+//            String senderSessionKey = sessionKeyManager.getKey(senderUsername);
+//            String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
+//
+//            clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
+//
+//            message.setContent(clearText);
+//            messageRepository.save(message);
+//            if (recipientSessionKey != null) {
+//                message.setContent(encryptionUtil.encrypt(clearText, recipientSessionKey));
+//                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+//            }
+//
+//            if (senderSessionKey != null) {
+//                message.setContent(encryptionUtil.encrypt(clearText, senderSessionKey));
+//                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
+//            }
+//
+//        } else {
+//            // Если это фото или видео без текста — просто сохраняем как есть
+//            messageRepository.save(message);
+//        }
+//
+//        System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + message.getImageUrl());
+//
+//        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+//            messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+//        }
+//
+//        // Шлем обратно отправителю (чтобы синее облачко на эмуляторе отобразило чистый текст и галочку)
+//        if (message.getSender() != null && message.getSender().getId() != null) {
+//            messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
+//        }
+//        // Шлём пуш-уведомление
+//        try {
+//            User recipient = message.getRecipient();
+//
+//            if (recipient != null) {
+//                Optional<User> recipientFromDb = userRepository.findById(recipient.getId());
+//
+//                if (recipientFromDb.isPresent() && recipientFromDb.get().getFcmToken() != null) {
+//
+//                    String targetToken = recipientFromDb.get().getFcmToken();
+//                    String senderName = "Пользователь";
+//
+//                    if (message.getSender() != null && message.getSender().getId() != null) {
+//                        Optional<User> senderFromDb = userRepository.findById(message.getSender().getId());
+//                        if (senderFromDb.isPresent()) {
+//                            senderName = senderFromDb.get().getUsername();
+//                        }
+//
+//                        String title = senderName;
+//                        String body = (clearText != null && !clearText.isEmpty()) ? clearText : message.getContent();
+//                        if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
+//                            if (body == null || body.trim().isEmpty()) {
+//                                body = "Фотография";
+//                            }
+//                        }
+//
+//                        pushNotificationService.sendPushNotification(
+//                                targetToken,
+//                                title,
+//                                body,
+//                                message.getSender().getId(),
+//                                senderName
+//                        );
+//                    }
+//                }
+//            }
+//        } catch(Exception e){
+//            System.err.println("🟨 Не удалось отправить пуш-уведомление: " + e.getMessage());
+//        }
+//    }
 
     @PostMapping("/api/chat/status/delivered")
     @Operation(
