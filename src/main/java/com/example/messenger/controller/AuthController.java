@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -106,6 +107,29 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Фоновое восстановление крипто-сессии", description = "Принимает новый публичный ключ телефона авторизованного пользователя и возвращает публичный ключ сервера для восстановления AES-сессии.")
+    @PostMapping("/refresh-session")
+    public ResponseEntity<com.example.messenger.dto.RefreshSessionResponse> refreshSession(
+            @RequestBody com.example.messenger.dto.RefreshSessionRequest request,
+            java.security.Principal principal) {
+
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        try {
+            String username = principal.getName();
+            String clientPublicKey = request.getClientPublicKey();
+
+            // Вызываем наш чистый метод из сервиса
+            com.example.messenger.dto.RefreshSessionResponse response = authService.refreshSession(username, clientPublicKey);
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 }
