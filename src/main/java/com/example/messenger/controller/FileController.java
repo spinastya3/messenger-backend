@@ -1,5 +1,7 @@
 package com.example.messenger.controller;
 
+import com.example.messenger.repository.MessageRepository;
+import com.example.messenger.service.FileSecurityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -17,6 +19,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +33,13 @@ public class FileController {
 
     // Путь к нашей вечной папке на Амвере
     private static final String UPLOAD_DIR = "/data/uploads/";
+    private static final Object lock = new Object();
+
+    private final FileSecurityService fileSecurityService;
+
+    public FileController(FileSecurityService fileSecurityService) {
+        this.fileSecurityService = fileSecurityService;
+    }
 
     @Operation(
             summary = "Загрузить фотографию на сервер",
@@ -90,7 +100,10 @@ public class FileController {
     }
 
     @GetMapping("/uploads/photos/{filename:.+}")
-    public ResponseEntity<Resource> getPhoto(@PathVariable String filename) throws IOException {
+    public ResponseEntity<Resource> getPhoto(@PathVariable String filename, Principal principal) throws IOException {
+
+        fileSecurityService.checkFileAccess(filename, principal);
+
         Path filePath = Paths.get(UPLOAD_DIR, "photos").resolve(filename);
         Resource resource = new UrlResource(filePath.toUri());
 
@@ -109,7 +122,10 @@ public class FileController {
     @GetMapping("/uploads/videos/{filename:.+}")
     public ResponseEntity<ResourceRegion> getVideo(
             @PathVariable String filename,
-            @RequestHeader HttpHeaders headers) throws java.io.IOException {
+            @RequestHeader HttpHeaders headers,
+            Principal principal) throws java.io.IOException {
+
+        fileSecurityService.checkFileAccess(filename, principal);
 
         Path filePath = Paths.get(UPLOAD_DIR, "videos").resolve(filename);
         Resource video = new UrlResource(filePath.toUri());
@@ -141,8 +157,6 @@ public class FileController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(region);
     }
-
-    private static final Object lock = new Object();
 
     @PostMapping("/upload-chunk")
     public ResponseEntity<?> uploadChunk(
@@ -227,73 +241,5 @@ public class FileController {
             return ResponseEntity.status(500).body("Ошибка склейки: " + e.getMessage());
         }
     }
-
-
-//@PostMapping("/upload-chunk")
-//public ResponseEntity<?> uploadChunk(
-//        @RequestParam("file") MultipartFile chunk,
-//        @RequestParam("fileName") String fileName,
-//        @RequestParam("chunkIndex") int chunkIndex,
-//        @RequestParam("isLast") boolean isLast) {
-//
-//    try {
-//        // Базовый путь и папка для хранения готовых видео
-//        String baseUploadDir = "/data/uploads/";
-//        String videoUploadDir = baseUploadDir + "videos/";
-//
-//        // Убеждаемся, что папка для видео существует
-//        File videoDir = new File(videoUploadDir);
-//        if (!videoDir.exists()) videoDir.mkdirs();
-//
-//        // 1. Временные кусочки сохраняем в корень (чтобы не мешать готовым файлам)
-//        File chunkFile = new File(baseUploadDir + fileName + ".part" + chunkIndex);
-//        chunk.transferTo(chunkFile);
-//
-//        // Если это последний кусок — запускаем конвейер склейки в папку videos!
-//        if (isLast) {
-//            // 🔥 ИСПРАВЛЕНО: Финальный файл собираем СТРОГО внутри папки videos/
-//            File finalFile = new File(videoUploadDir + fileName);
-//
-//            try (FileOutputStream fos = new FileOutputStream(finalFile, true)) {
-//                byte[] buffer = new byte[65536]; // Порциями по 64 КБ
-//
-//                for (int i = 0; i <= chunkIndex; i++) {
-//                    File currentChunk = new File(baseUploadDir + fileName + ".part" + i);
-//                    if (currentChunk.exists()) {
-//                        try (FileInputStream fis = new FileInputStream(currentChunk)) {
-//                            int bytesRead;
-//                            while ((bytesRead = fis.read(buffer)) != -1) {
-//                                fos.write(buffer, 0, bytesRead);
-//                            }
-//                        }
-//                        currentChunk.delete(); // Сразу удаляем мусорный кусочек с диска
-//                    }
-//                }
-//            }
-//
-//            // Получаем домен для абсолютной ссылки
-//            String currentDomain = org.springframework.web.servlet.support.ServletUriComponentsBuilder
-//                    .fromCurrentContextPath()
-//                    .build()
-//                    .toUriString();
-//
-//            if (currentDomain.startsWith("http://") && !currentDomain.contains("localhost")) {
-//                currentDomain = currentDomain.replace("http://", "https://");
-//            }
-//
-//            // Собираем полный путь, который теперь точно совпадет с физическим местом на диске
-//            String fullAbsoluteVideoUrl = currentDomain + "/api/files/uploads/videos/" + fileName;
-//
-//            System.out.println("🟩 Видео успешно склеено в подпапку! Выдаем URL: " + fullAbsoluteVideoUrl);
-//            return ResponseEntity.ok(Map.of("imageUrl", fullAbsoluteVideoUrl));
-//        }
-//
-//        return ResponseEntity.ok(Map.of("status", "chunk_saved", "index", chunkIndex));
-//
-//    } catch (Exception e) {
-//        e.printStackTrace();
-//        return ResponseEntity.status(500).body("Ошибка склейки чанка: " + e.getMessage());
-//    }
-//}
 }
 
