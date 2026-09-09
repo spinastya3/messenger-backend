@@ -354,7 +354,7 @@ public class MessageController {
         String userSessionKey = sessionKeyManager.getKey(requesterUsername);
 
         if (userSessionKey == null) {
-            System.err.println("❌ [БЭКЕНД] Критическая ошибка: сессионный ключ для пользователя " + requesterUsername + " не найден в памяти!");
+            System.err.println("❌ [БЭКЕНД] Критическая ошибка: сессионный ключ для userId: " + senderId + " не найден в памяти!");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Ошибка безопасности: сессия не найдена");
         }
 
@@ -382,9 +382,7 @@ public class MessageController {
             dtoList.add(dto);
         }
 
-        System.out.println("🟩 [БЭКЕНД] История успешно зашифрована сессионным ключом для '" + requesterUsername + "' и отдается. Размер: " + history.size());
-
-        // 5. Отдаем зашифрованную историю в сеть!
+        System.out.println("🟩 [БЭКЕНД] История успешно зашифрована сессионным ключом для userId: " + senderId + " и отдается. Размер: " + history.size());        // 5. Отдаем зашифрованную историю в сеть!
         return ResponseEntity.ok(dtoList);
     }
 
