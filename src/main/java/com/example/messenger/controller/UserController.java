@@ -11,13 +11,9 @@ import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 
-import static org.springframework.http.HttpStatus.*;
-
-
 @RestController
 @RequestMapping("/api/users") // Все запросы будут начинаться с этого адреса
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "User Controller", description = "Управление профилями пользователей и безопасным поиском контактов")
 public class UserController {
 
@@ -54,23 +50,23 @@ public class UserController {
         return ResponseEntity.ok(activeUsers);
     }
 
-    @Operation(
-            summary = "Удалить пользователя по его ID",
-            description = "Удаляет пользователя из таблицы Postgres. Для тестов"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Пользователь успешно стерт из базы данных"),
-            @ApiResponse(responseCode = "404", description = "Ошибка: пользователя с таким ID не существует в Postgres")
-    })
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable Long id){
-        if (userRepository.existsById(id)){
-            userRepository.deleteById(id);
-            return  ResponseEntity.ok("Пользователь с ID " + id + " удален");
-        } else {
-            return ResponseEntity
-                    .status(NOT_FOUND)
-                    .body("Пользователь не найден");
-        }
-    }
+//    @Operation(
+//            summary = "Удалить пользователя по его ID",
+//            description = "Удаляет пользователя из таблицы Postgres. Для тестов"
+//    )
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Пользователь успешно стерт из базы данных"),
+//            @ApiResponse(responseCode = "404", description = "Ошибка: пользователя с таким ID не существует в Postgres")
+//    })
+//    @DeleteMapping("/delete/{id}")
+//    public ResponseEntity<String> deleteUser(@PathVariable Long id){
+//        if (userRepository.existsById(id)){
+//            userRepository.deleteById(id);
+//            return  ResponseEntity.ok("Пользователь с ID " + id + " удален");
+//        } else {
+//            return ResponseEntity
+//                    .status(NOT_FOUND)
+//                    .body("Пользователь не найден");
+//        }
+//    }
 }
