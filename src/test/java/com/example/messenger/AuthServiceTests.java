@@ -63,8 +63,7 @@ class AuthServiceTests {
         Map<String, String> response = authService.register(username, rawPassword, email, MOCK_FCM_TOKEN, mockClientPublicKey);        assertNotNull(response);
         assertEquals("Поздравляю! Вы в ElisMessenger!", response.get("message"));
         verify(userRepository, times(1)).save(any(User.class));
-        verify(cryptoHandshakeUtil, times(1)).processHandshake(eq(username), eq(mockClientPublicKey), any(Map.class));
-    }
+        verify(cryptoHandshakeUtil, never()).processHandshake(anyString(), any(), any(Map.class));    }
 
     @Test
     void register_ThrowsException_WhenEmailIsInvalid() {

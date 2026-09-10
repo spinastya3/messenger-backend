@@ -1,5 +1,7 @@
 package com.example.messenger.controller;
 
+import com.example.messenger.dto.RefreshSessionRequest;
+import com.example.messenger.dto.RefreshSessionResponse;
 import com.example.messenger.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -112,8 +114,8 @@ public class AuthController {
 
     @Operation(summary = "Фоновое восстановление крипто-сессии", description = "Принимает новый публичный ключ телефона авторизованного пользователя и возвращает публичный ключ сервера для восстановления AES-сессии.")
     @PostMapping("/refresh-session")
-    public ResponseEntity<com.example.messenger.dto.RefreshSessionResponse> refreshSession(
-            @RequestBody com.example.messenger.dto.RefreshSessionRequest request,
+    public ResponseEntity<RefreshSessionResponse> refreshSession(
+            @RequestBody RefreshSessionRequest request,
             java.security.Principal principal) {
 
         if (principal == null) {
@@ -125,7 +127,7 @@ public class AuthController {
             String clientPublicKey = request.getClientPublicKey();
 
             // Вызываем наш чистый метод из сервиса
-            com.example.messenger.dto.RefreshSessionResponse response = authService.refreshSession(username, clientPublicKey);
+            RefreshSessionResponse response = authService.refreshSession(username, clientPublicKey);
 
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

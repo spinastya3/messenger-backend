@@ -57,7 +57,9 @@ public class WebSocketEventListener {
             // Удаляем временный AES-ключ этого пользователя из оперативной памяти бэкенда
             sessionKeyManager.removeKey(username);
 
-            log.info("🧹 [SOCKET-CRYPTO] Сессионный ключ пользователя '{}' успешно стёрт из памяти сервера.", username);
+            int anonymizedId = Math.abs(username.hashCode() % 10000);
+
+            log.info("🧹 [SOCKET-CRYPTO] Сессионный ключ для anonymizedId: {} успешно стёрт из памяти сервера.", anonymizedId);
         } else {
             log.warn("🟨 [SOCKET-CRYPTO] Не удалось определить имя пользователя при дисконнекте. Возможно, сессия не была авторизована.");
         }

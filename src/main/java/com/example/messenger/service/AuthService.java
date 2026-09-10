@@ -87,7 +87,7 @@ public class AuthService {
         response.put("message", "Поздравляю! Вы в ElisMessenger!");
 
         // Вызываем утилиту рукопожатия
-        cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
+        //  cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
 
         return response;
     }

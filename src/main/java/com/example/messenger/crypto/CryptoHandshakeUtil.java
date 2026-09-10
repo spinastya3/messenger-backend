@@ -35,7 +35,9 @@ public class CryptoHandshakeUtil {
             String serverPublicKeyBase64 = Base64.getEncoder().encodeToString(serverKeyPair.getPublic().getEncoded());
             responseMap.put("serverPublicKey", serverPublicKeyBase64);
 
-            System.out.println("🟩 [ECDH-UTIL] Сессионный ключ для юзера " + username + " успешно сгенерирован и упакован.");
+            int anonymizedId = (username != null) ? Math.abs(username.hashCode() % 10000) : 0;
+
+            System.out.println("🟩 [ECDH-UTIL] Сессионный ключ для юзера " + anonymizedId + " успешно сгенерирован и упакован.");
         } catch (Exception e) {
             throw new IllegalArgumentException("Критическая ошибка криптографии ECDH во время рукопожатия: " + e.getMessage(), e);
         }
