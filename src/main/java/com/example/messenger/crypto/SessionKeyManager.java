@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class SessionKeyManager {
 
     /** Сколько секунд ключ живёт после разрыва сокета, если юзер не вернётся. */
-    private static final int GRACE_PERIOD_SECONDS = 30;
+    private static final int GRACE_PERIOD_SECONDS = 180;
 
     // Хранилище: Username -> Временный AES Ключ сессии (в Base64)
     private final Map<String, String> userKeys = new ConcurrentHashMap<>();
