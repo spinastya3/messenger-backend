@@ -69,34 +69,85 @@ public class MessageController {
             String recipientUsername = message.getRecipient().getUsername();
 
             String senderSessionKey = sessionKeyManager.getKey(senderUsername);
+            String senderPreviousKey = sessionKeyManager.getPreviousKey(senderUsername);
             String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
+            String recipientPreviousKey = sessionKeyManager.getPreviousKey(recipientUsername);
 
-            // 1. Расшифровываем входящий пакет от мобилки
-            clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
+            // 1. Расшифровываем входящий пакет от мобилки (с fallback на previous)
+            try {
+                clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
+            } catch (Exception e) {
+                if (senderPreviousKey != null) {
+                    try {
+                        clearText = encryptionUtil.decrypt(message.getContent(), senderPreviousKey);
+                        System.out.println("⚠️ [CRYPTO] Расшифровано PREVIOUS ключом для " + senderUsername);
+                    } catch (Exception e2) {
+                        System.err.println("❌ [CRYPTO] Ни current, ни previous не подошли для "
+                                + senderUsername + ". Дропаем сообщение. " + e.getMessage());
+                        return;   // ← НЕ сохраняем мусор
+                    }
+                } else {
+                    System.err.println("❌ [CRYPTO] Ошибка дешифрования, previous нет для "
+                            + senderUsername + ". Дропаем. " + e.getMessage());
+                    return;
+                }
+            }
 
-            // 2. Сохраняем в БД чистый текст (JPA-конвертер сам зашифрует его для диска)
+            // 2. Сохраняем в БД чистый текст
             message.setContent(clearText);
             messageRepository.save(message);
 
-            // 3. Отправляем ПОЛУЧАТЕЛЮ персональный сетевой шифр
-            if (recipientSessionKey != null) {
-                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientSessionKey);
-
-                // Чтобы не портить оригинальный объект message по ссылке,
-                // временно подставляем шифр получателя, стреляем в сокет и сразу возвращаем чистый текст обратно!
+            // 3. Отправляем ПОЛУЧАТЕЛЮ — с fallback на его previous, если current нет
+            String recipientKey = (recipientSessionKey != null) ? recipientSessionKey : recipientPreviousKey;
+            if (recipientKey != null) {
+                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientKey);
                 message.setContent(encryptedForRecipient);
                 messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
-                message.setContent(clearText); // Вернули чистый текст!
+                message.setContent(clearText);
             }
 
-            // 4. Отправляем ОТПРАВИТЕЛЮ (эхо-подтверждение) его персональный сетевой шифр
-            if (senderSessionKey != null) {
-                String encryptedForSender = encryptionUtil.encrypt(clearText, senderSessionKey);
-
+            // 4. Отправляем ОТПРАВИТЕЛЮ — с fallback
+            String senderKey = (senderSessionKey != null) ? senderSessionKey : senderPreviousKey;
+            if (senderKey != null) {
+                String encryptedForSender = encryptionUtil.encrypt(clearText, senderKey);
                 message.setContent(encryptedForSender);
                 messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
-                message.setContent(clearText); // Вернули чистый текст!
+                message.setContent(clearText);
             }
+
+//        if (message.getContent() != null) {
+//            String senderUsername = message.getSender().getUsername();
+//            String recipientUsername = message.getRecipient().getUsername();
+//
+//            String senderSessionKey = sessionKeyManager.getKey(senderUsername);
+//            String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
+//
+//            // 1. Расшифровываем входящий пакет от мобилки
+//            clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
+//
+//            // 2. Сохраняем в БД чистый текст (JPA-конвертер сам зашифрует его для диска)
+//            message.setContent(clearText);
+//            messageRepository.save(message);
+//
+//            // 3. Отправляем ПОЛУЧАТЕЛЮ персональный сетевой шифр
+//            if (recipientSessionKey != null) {
+//                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientSessionKey);
+//
+//                // Чтобы не портить оригинальный объект message по ссылке,
+//                // временно подставляем шифр получателя, стреляем в сокет и сразу возвращаем чистый текст обратно!
+//                message.setContent(encryptedForRecipient);
+//                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+//                message.setContent(clearText); // Вернули чистый текст!
+//            }
+//
+//            // 4. Отправляем ОТПРАВИТЕЛЮ (эхо-подтверждение) его персональный сетевой шифр
+//            if (senderSessionKey != null) {
+//                String encryptedForSender = encryptionUtil.encrypt(clearText, senderSessionKey);
+//
+//                message.setContent(encryptedForSender);
+//                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
+//                message.setContent(clearText); // Вернули чистый текст!
+//            }
 
         } else {
             // Если это медиафайл без текста — просто сохраняем и делаем стандартную сокет-рассылку

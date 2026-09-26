@@ -42,9 +42,13 @@ public class EncryptionUtil {
 
             byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
             return new String(decryptedBytes, StandardCharsets.UTF_8);
+//        } catch (Exception e) {
+//            System.err.println("❌ Ошибка сессионного дешифрования: " + e.getMessage());
+//            return encryptedText;
+//        }
         } catch (Exception e) {
             System.err.println("❌ Ошибка сессионного дешифрования: " + e.getMessage());
-            return encryptedText;
+            throw new RuntimeException("Decrypt failed", e);   // ← пусть вызывающий решает
         }
     }
 }
