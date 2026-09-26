@@ -28,6 +28,9 @@ public class CryptoHandshakeUtil {
             // 2. Вычисляем общий секрет AES-256
             String sharedKeyBase64 = dhCryptoService.computeSharedSecret(serverKeyPair.getPrivate(), clientPublicKey);
 
+            System.out.println("🟩 [ECDH-UTIL] processHandshake ВЫЗВАН для username=" + username
+                    + " в " + java.time.LocalTime.now());
+
             // 3. Сохраняем сессионный ключ в оперативку сервера
             sessionKeyManager.saveKey(username, sharedKeyBase64);
 

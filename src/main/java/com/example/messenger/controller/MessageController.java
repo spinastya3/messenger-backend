@@ -243,10 +243,17 @@ public class MessageController {
 
         // 2. Узнаем имя пользователя, который сделал этот HTTP-запрос
         String requesterUsername = principal.getName();
+
+        System.out.println("🔎 getChatHistory: requesterUsername=[" + requesterUsername
+                + "] | senderId=" + senderId
+                + " | ключи в map: " + sessionKeyManager.getAllKeys());
+
         String userSessionKey = sessionKeyManager.getKey(requesterUsername);
 
         if (userSessionKey == null) {
-            System.err.println("❌ [БЭКЕНД] Критическая ошибка: сессионный ключ для userId: " + senderId + " не найден в памяти!");
+            System.err.println("❌ [БЭКЕНД] Ключ не найден. requesterUsername=[" + requesterUsername
+                    + "] | senderId=" + senderId
+                    + " | ключи в map: " + sessionKeyManager.getAllKeys());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Ошибка безопасности: сессия не найдена");
         }
 

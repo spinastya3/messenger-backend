@@ -3,6 +3,7 @@ package com.example.messenger.crypto;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -85,5 +86,9 @@ public class SessionKeyManager {
             int anonymizedId = Math.abs(username.hashCode() % 10000);
             System.out.println("🛡️ [SOCKET-CRYPTO] Удаление ключа для anonymizedId " + anonymizedId + " отменено");
         }
+    }
+
+    public Set<String> getAllKeys() {
+        return userKeys.keySet();
     }
 }
