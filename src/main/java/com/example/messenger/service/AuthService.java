@@ -1,7 +1,5 @@
 package com.example.messenger.service;
 
-import com.example.messenger.crypto.CryptoHandshakeUtil;
-import com.example.messenger.dto.RefreshSessionResponse;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
@@ -21,19 +19,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
-    private final CryptoHandshakeUtil cryptoHandshakeUtil;
-
-
     private final Map<String, String> resetCodesCache = new ConcurrentHashMap<>();
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil, EmailService emailService,
-                       CryptoHandshakeUtil cryptoHandshakeUtil) {
+                       JwtUtil jwtUtil, EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
-        this.cryptoHandshakeUtil = cryptoHandshakeUtil;
     }
 
     // Регистрируем пользователя, если логин уникальный
@@ -76,6 +69,7 @@ public class AuthService {
                 .password(encodedPassword)
                 .email(email)
                 .fcmToken(fcmToken)
+                .publicKey(clientPublicKey)
                 .build();
 
         // Сохраняем юзера в БД
@@ -85,9 +79,6 @@ public class AuthService {
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "Поздравляю! Вы в ElisMessenger!");
-
-        // Вызываем утилиту рукопожатия
-        //  cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
 
         return response;
     }
@@ -112,8 +103,10 @@ public class AuthService {
         response.put("userId", String.valueOf(user.getId()));
         response.put("message", "С возвращением в ElisMessenger!");
 
-        cryptoHandshakeUtil.processHandshake(username, clientPublicKey, response);
-
+        if (clientPublicKey != null && !clientPublicKey.isEmpty()) {
+            user.setPublicKey(clientPublicKey);
+            userRepository.save(user);
+        }
         return response;
     }
 
@@ -155,22 +148,12 @@ public class AuthService {
         return Map.of("message", "Пароль успешно изменен! Войдите с новым паролем.");
     }
 
-    public RefreshSessionResponse refreshSession(String username, String clientPublicKey) {
-        if (clientPublicKey == null || clientPublicKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("Client public key is missing");
-        }
-
-        // Находим пользователя в базе данных, чтобы получить его ID
+    public void updatePublicKey(String username, String publicKey) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        // Временно создаем мапу для утилиты рукопожатия, куда она сама положит "serverPublicKey"
-        Map<String, String> handshakeMap = new HashMap<>();
-        cryptoHandshakeUtil.processHandshake(username, clientPublicKey, handshakeMap);
-
-        String serverPublicKey = handshakeMap.get("serverPublicKey");
-
-        // Возвращаем строго типизированный красивый DTO-ответ
-        return new com.example.messenger.dto.RefreshSessionResponse(serverPublicKey, String.valueOf(user.getId()));
+        user.setPublicKey(publicKey);
+        userRepository.save(user);
+        System.out.println("🔑 [E2EE] Публичный ключ обновлён для " + username);
     }
 }

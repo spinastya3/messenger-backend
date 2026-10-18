@@ -1,6 +1,5 @@
 package com.example.messenger.config;
 
-import com.example.messenger.crypto.SessionKeyManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -16,11 +15,6 @@ import java.security.Principal;
 public class WebSocketEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketEventListener.class);
-    private final SessionKeyManager sessionKeyManager;
-
-    public WebSocketEventListener(SessionKeyManager sessionKeyManager) {
-        this.sessionKeyManager = sessionKeyManager;
-    }
 
     // 📡 1. ШПИОН НА ПОПЫТКУ ПОДКЛЮЧЕНИЯ (Срабатывает в секунду connect)
     @EventListener
@@ -53,11 +47,6 @@ public class WebSocketEventListener {
         Principal principal = headerAccessor.getUser();
         if (principal != null && principal.getName() != null) {
             String username = principal.getName();
-
-            // Удаляем временный AES-ключ этого пользователя из оперативной памяти бэкенда
-            sessionKeyManager.scheduleRemoval(username);
-            // sessionKeyManager.removeKey(username);
-
             int anonymizedId = Math.abs(username.hashCode() % 10000);
 
             log.info("🟨 [SOCKET-CRYPTO] Ключ для anonymizedId {} запланирован к удалению через 180 сек.", anonymizedId);

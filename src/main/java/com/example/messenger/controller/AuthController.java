@@ -112,9 +112,10 @@ public class AuthController {
         }
     }
 
-    @Operation(summary = "Фоновое восстановление крипто-сессии", description = "Принимает новый публичный ключ телефона авторизованного пользователя и возвращает публичный ключ сервера для восстановления AES-сессии.")
+    @Operation(summary = "Обновление публичного ключа пользователя (E2EE)",
+            description = "Принимает публичный ключ клиента и сохраняет его в БД. Сервер больше не делает handshake.")
     @PostMapping("/refresh-session")
-    public ResponseEntity<RefreshSessionResponse> refreshSession(
+    public ResponseEntity<?> refreshSession(
             @RequestBody RefreshSessionRequest request,
             java.security.Principal principal) {
 
@@ -126,12 +127,17 @@ public class AuthController {
             String username = principal.getName();
             String clientPublicKey = request.getClientPublicKey();
 
-            // Вызываем наш чистый метод из сервиса
-            RefreshSessionResponse response = authService.refreshSession(username, clientPublicKey);
+            if (clientPublicKey == null || clientPublicKey.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Публичный ключ не передан"));
+            }
 
-            return ResponseEntity.ok(response);
+            // Сохраняем публичный ключ в БД
+            authService.updatePublicKey(username, clientPublicKey);
+
+            // Возвращаем пустой ответ (клиенту больше не нужен serverPublicKey)
+            return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

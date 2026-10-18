@@ -26,6 +26,7 @@ public class Message {
     private String contentPreview; // Для пушей (чистый текст, присылаемый клиентом)
     private LocalDateTime timestamp;
     private String imageUrl;
+    private Long chatId;
 
     @Enumerated(EnumType.STRING)
     @Column(
@@ -33,6 +34,7 @@ public class Message {
             nullable = true,
             columnDefinition = "VARCHAR(255) CHECK (status IN ('SENT', 'DELIVERED', 'READ'))"
     )
+
     private MessageStatus status = MessageStatus.SENT;
 
     public MessageStatus getStatus() {

@@ -6,10 +6,12 @@ import com.example.messenger.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users") // Все запросы будут начинаться с этого адреса
@@ -50,23 +52,17 @@ public class UserController {
         return ResponseEntity.ok(activeUsers);
     }
 
-//    @Operation(
-//            summary = "Удалить пользователя по его ID",
-//            description = "Удаляет пользователя из таблицы Postgres. Для тестов"
-//    )
-//    @ApiResponses(value = {
-//            @ApiResponse(responseCode = "200", description = "Пользователь успешно стерт из базы данных"),
-//            @ApiResponse(responseCode = "404", description = "Ошибка: пользователя с таким ID не существует в Postgres")
-//    })
-//    @DeleteMapping("/delete/{id}")
-//    public ResponseEntity<String> deleteUser(@PathVariable Long id){
-//        if (userRepository.existsById(id)){
-//            userRepository.deleteById(id);
-//            return  ResponseEntity.ok("Пользователь с ID " + id + " удален");
-//        } else {
-//            return ResponseEntity
-//                    .status(NOT_FOUND)
-//                    .body("Пользователь не найден");
-//        }
-//    }
+    @GetMapping("/api/users/{id}/public-key")
+    public ResponseEntity<?> getUserPublicKey(@PathVariable Long id) {
+        return userRepository.findById(id)
+                .map(user -> {
+                    if (user.getPublicKey() == null || user.getPublicKey().isEmpty()) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(Map.of("error", "У пользователя пока нет публичного ключа"));
+                    }
+                    return ResponseEntity.ok(Map.of("publicKey", user.getPublicKey()));
+                })
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Пользователь не найден")));
+    }
 }

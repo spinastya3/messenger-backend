@@ -34,6 +34,9 @@ public class User implements UserDetails {
 
     private String fcmToken; // Токен дла пуша
 
+    @Column(name = "public_key", columnDefinition = "TEXT", nullable = true)
+    private String publicKey;
+
     @Override //  всех пользователей одна доступная роль
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(() -> "ROLE_USER");
