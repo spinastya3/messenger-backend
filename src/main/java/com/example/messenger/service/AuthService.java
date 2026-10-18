@@ -94,6 +94,9 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Неверный пароль!"));
 
         user.setFcmToken(fcmToken);
+        if (clientPublicKey != null && !clientPublicKey.isEmpty()) {
+            user.setPublicKey(clientPublicKey);
+        }
         userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getId());

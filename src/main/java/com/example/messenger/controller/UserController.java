@@ -52,7 +52,7 @@ public class UserController {
         return ResponseEntity.ok(activeUsers);
     }
 
-    @GetMapping("/api/users/{id}/public-key")
+    @GetMapping("/{id}/public-key")
     public ResponseEntity<?> getUserPublicKey(@PathVariable Long id) {
         return userRepository.findById(id)
                 .map(user -> {

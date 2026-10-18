@@ -1,7 +1,6 @@
 package com.example.messenger.controller;
 
 import com.example.messenger.dto.RefreshSessionRequest;
-import com.example.messenger.dto.RefreshSessionResponse;
 import com.example.messenger.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
