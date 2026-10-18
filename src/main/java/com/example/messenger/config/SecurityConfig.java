@@ -32,27 +32,6 @@ public class SecurityConfig {
     }
 
     // Запрос токена
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity https) throws Exception {
-//        https
-//                // Отключаем защиту с помощию кук (так как у нас токены)
-//                .csrf(AbstractHttpConfigurer::disable)
-//
-//                // Доступ регистрации, авторизации, сброса пароле всегда открыт для всех
-//                .authorizeHttpRequests(auth -> auth
-//                        .requestMatchers("/api/auth/**").permitAll()
-//                        .requestMatchers("/ws/**").permitAll()
-//                        .requestMatchers("/api/files/uploads/**").permitAll()
-//                        .requestMatchers("/api/files/upload").permitAll()
-//                        .requestMatchers("/api/files/upload-chunk").permitAll()
-//                        .anyRequest().authenticated()
-//                )
-//                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-//
-//        return https.build();
-//    }
-
-    // Запрос токена
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity https) throws Exception {
         https
@@ -66,6 +45,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/api/users/*/public-key").authenticated() // 🚀 Разрешаем авторизованным
                         .requestMatchers("/api/files/**").authenticated()
                         .anyRequest().authenticated()
                 )
