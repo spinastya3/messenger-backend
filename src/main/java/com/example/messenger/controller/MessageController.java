@@ -1,6 +1,5 @@
 package com.example.messenger.controller;
 
-import com.example.messenger.crypto.SessionKeyManager;
 import com.example.messenger.dto.MessageDto;
 import com.example.messenger.service.MessageService;
 import com.example.messenger.service.PushNotificationService;
@@ -9,7 +8,6 @@ import com.example.messenger.model.MessageStatus;
 import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
-import com.example.messenger.crypto.EncryptionUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,19 +29,14 @@ import java.util.Optional;
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 public class MessageController {
 
-    private final SimpMessagingTemplate messagingTemplate; // Пересылает сообщения
-    private final MessageRepository messageRepository; // Где хранятся сообщения в БД
-    private final UserRepository userRepository; // Пользователи
-    private final PushNotificationService pushNotificationService; // Пуши
-    private final MessageService messageService; // Пагинация
-    private final EncryptionUtil encryptionUtil; // Шифрование сообщений
-    private final SessionKeyManager sessionKeyManager;
-
-
+    private final SimpMessagingTemplate messagingTemplate;
+    private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
+    private final PushNotificationService pushNotificationService;
+    private final MessageService messageService;
 
     @MessageMapping("/chat.send")
     public void processMessage(@Payload Message message) {
-
         System.out.println("🔍 [ДО СОХРАНЕНИЯ] Ссылка от мобилки: " + message.getImageUrl());
 
         // 🛡️ Валидация юзеров из БД
@@ -62,109 +55,19 @@ public class MessageController {
         message.setTimestamp(LocalDateTime.now());
         message.setStatus(MessageStatus.SENT);
 
-        String clearText = "";
+        messageRepository.save(message);
 
-        if (message.getContent() != null) {
-            String senderUsername = message.getSender().getUsername();
-            String recipientUsername = message.getRecipient().getUsername();
+        if (message.getRecipient() != null && message.getRecipient().getId() != null) {
+            messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
+        }
 
-            String senderSessionKey = sessionKeyManager.getKey(senderUsername);
-            String senderPreviousKey = sessionKeyManager.getPreviousKey(senderUsername);
-            String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
-            String recipientPreviousKey = sessionKeyManager.getPreviousKey(recipientUsername);
-
-            // 1. Расшифровываем входящий пакет от мобилки (с fallback на previous)
-            try {
-                clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
-            } catch (Exception e) {
-                if (senderPreviousKey != null) {
-                    try {
-                        clearText = encryptionUtil.decrypt(message.getContent(), senderPreviousKey);
-                        System.out.println("⚠️ [CRYPTO] Расшифровано PREVIOUS ключом для " + senderUsername);
-                    } catch (Exception e2) {
-                        System.err.println("❌ [CRYPTO] Ни current, ни previous не подошли для "
-                                + senderUsername + ". Дропаем сообщение. " + e.getMessage());
-                        return;   // ← НЕ сохраняем мусор
-                    }
-                } else {
-                    System.err.println("❌ [CRYPTO] Ошибка дешифрования, previous нет для "
-                            + senderUsername + ". Дропаем. " + e.getMessage());
-                    return;
-                }
-            }
-
-            // 2. Сохраняем в БД чистый текст
-            message.setContent(clearText);
-            messageRepository.save(message);
-
-            // 3. Отправляем ПОЛУЧАТЕЛЮ — с fallback на его previous, если current нет
-            String recipientKey = (recipientSessionKey != null) ? recipientSessionKey : recipientPreviousKey;
-            if (recipientKey != null) {
-                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientKey);
-                message.setContent(encryptedForRecipient);
-                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
-                message.setContent(clearText);
-            }
-
-            // 4. Отправляем ОТПРАВИТЕЛЮ — с fallback
-            String senderKey = (senderSessionKey != null) ? senderSessionKey : senderPreviousKey;
-            if (senderKey != null) {
-                String encryptedForSender = encryptionUtil.encrypt(clearText, senderKey);
-                message.setContent(encryptedForSender);
-                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
-                message.setContent(clearText);
-            }
-
-//        if (message.getContent() != null) {
-//            String senderUsername = message.getSender().getUsername();
-//            String recipientUsername = message.getRecipient().getUsername();
-//
-//            String senderSessionKey = sessionKeyManager.getKey(senderUsername);
-//            String recipientSessionKey = sessionKeyManager.getKey(recipientUsername);
-//
-//            // 1. Расшифровываем входящий пакет от мобилки
-//            clearText = encryptionUtil.decrypt(message.getContent(), senderSessionKey);
-//
-//            // 2. Сохраняем в БД чистый текст (JPA-конвертер сам зашифрует его для диска)
-//            message.setContent(clearText);
-//            messageRepository.save(message);
-//
-//            // 3. Отправляем ПОЛУЧАТЕЛЮ персональный сетевой шифр
-//            if (recipientSessionKey != null) {
-//                String encryptedForRecipient = encryptionUtil.encrypt(clearText, recipientSessionKey);
-//
-//                // Чтобы не портить оригинальный объект message по ссылке,
-//                // временно подставляем шифр получателя, стреляем в сокет и сразу возвращаем чистый текст обратно!
-//                message.setContent(encryptedForRecipient);
-//                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
-//                message.setContent(clearText); // Вернули чистый текст!
-//            }
-//
-//            // 4. Отправляем ОТПРАВИТЕЛЮ (эхо-подтверждение) его персональный сетевой шифр
-//            if (senderSessionKey != null) {
-//                String encryptedForSender = encryptionUtil.encrypt(clearText, senderSessionKey);
-//
-//                message.setContent(encryptedForSender);
-//                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
-//                message.setContent(clearText); // Вернули чистый текст!
-//            }
-
-        } else {
-            // Если это медиафайл без текста — просто сохраняем и делаем стандартную сокет-рассылку
-            messageRepository.save(message);
-
-            if (message.getRecipient() != null && message.getRecipient().getId() != null) {
-                messagingTemplate.convertAndSend("/topic/messages." + message.getRecipient().getId(), message);
-            }
-            if (message.getSender() != null && message.getSender().getId() != null) {
-                messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
-            }
+        if (message.getSender() != null && message.getSender().getId() != null) {
+            messagingTemplate.convertAndSend("/topic/messages." + message.getSender().getId(), message);
         }
 
         System.out.println("🔍 [ПОСЛЕ СОХРАНЕНИЯ] Ссылка из БД: " + message.getImageUrl());
 
-
-        // 🚀 ЛОГИКА ПУШЕЙ (Здесь в переменной clearText гарантированно лежит красивый чистый текст!)
+        // 🚀 ЛОГИКА ПУШЕЙ (Без текста сообщения, так как сервер его не знает)
         try {
             User recipient = message.getRecipient();
             if (recipient != null) {
@@ -181,12 +84,13 @@ public class MessageController {
                         }
 
                         String title = senderName;
-                        String body = (clearText != null && !clearText.isEmpty()) ? clearText : message.getContent();
+                        // На этапе E2EE текст сообщения для пуша неизвестен.
+                        // Пока используем заглушку. На этапе 3 добавим contentPreview.
+                        String body = "Новое сообщение";
 
-                        if (message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
-                            if (body == null || body.trim().isEmpty()) {
-                                body = "Фотография";
-                            }
+                        // Если это медиафайл (без текста), но с картинкой
+                        if (message.getContent() == null && message.getImageUrl() != null && !message.getImageUrl().isEmpty()) {
+                            body = "Фотография";
                         }
 
                         pushNotificationService.sendPushNotification(
@@ -205,10 +109,7 @@ public class MessageController {
     }
 
     @PostMapping("/api/chat/status/delivered")
-    @Operation(
-            summary = " [HTTP POST] Отметить сообщения от собеседника как доставленные через Пуш",
-            description = "Вызывается фоновым сервисом Android-клиента (MyFirebaseMessagingService) при получении пуша, когда само приложение закрыто. Переводит сообщения в статус DELIVERED и оповещает отправителя по сокету."
-    )
+    @Operation(summary = "Отметить сообщения как доставленные")
     public ResponseEntity<Void> markAsDeliveredHttp(
             @RequestParam Long senderId,
             @RequestParam Long recipientId) {
@@ -219,25 +120,19 @@ public class MessageController {
 
         System.out.println("📥 [БЭКЕНД] Фоновый HTTP запрос доставки. Отправитель: " + senderId + " | Получатель (мы): " + recipientId);
 
-        // Ищем в базе данных сообщения от друга к нам, которые еще в статусе SENT или NULL
         List<Message> sentMessages = messageRepository.findSentMessages(senderId, recipientId);
 
         if (!sentMessages.isEmpty()) {
             for (Message msg : sentMessages) {
                 msg.setStatus(MessageStatus.DELIVERED);
             }
-            // Массово сохраняем обновленные статусы сообщений в БД
             messageRepository.saveAll(sentMessages);
 
-            // Его телефон поймает этот пакет, и у него на экране одна серая галочка
-            // без перезаходов и морганий сменится на две белые галочки доставки!
             messagingTemplate.convertAndSend("/topic/messages.status." + senderId, Map.of(
                     "status", "DELIVERED",
                     "recipientId", recipientId,
                     "senderId", senderId
             ));
-
-            System.out.println("📩 [БЭКЕНД] Сообщения от " + senderId + " успешно переведены в DELIVERED через фоновый HTTP!");
         }
         return ResponseEntity.ok().build();
     }
@@ -249,7 +144,6 @@ public class MessageController {
 
         if (senderId == null || recipientId == null) return;
 
-        // Ищем непрочитанные в базе
         List<Message> unreadMessages = messageRepository.findUnreadMessages(senderId, recipientId);
 
         if (!unreadMessages.isEmpty()) {
@@ -275,12 +169,10 @@ public class MessageController {
             @RequestParam Long recipientId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            Principal principal) { // 🔥 Спринг автоматически подставит сюда авторизованного юзера!
+            Principal principal) {
 
         if (senderId == null || senderId <= 0 || recipientId == null || recipientId <= 0) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Ошибка 400: Некорректные ID пользователей");
+            return ResponseEntity.badRequest().body("Ошибка 400: Некорректные ID пользователей");
         }
 
         if (principal == null) {
@@ -289,38 +181,16 @@ public class MessageController {
 
         System.out.println("📥 [БЭКЕНД] HTTP запрос истории. Собеседники: " + senderId + " и " + recipientId + " | Страница: " + page);
 
-        // 1. Получаем чистую историю из базы (Hibernate уже расшифровал её ключом БД)
+        // Получаем историю из базы (она уже хранится в виде шифротекста)
         List<Message> history = messageService.getChatHistory(senderId, recipientId, page, size);
-
-        // 2. Узнаем имя пользователя, который сделал этот HTTP-запрос
-        String requesterUsername = principal.getName();
-
-        System.out.println("🔎 getChatHistory: requesterUsername=[" + requesterUsername
-                + "] | senderId=" + senderId
-                + " | ключи в map: " + sessionKeyManager.getAllKeys());
-
-        String userSessionKey = sessionKeyManager.getKey(requesterUsername);
-
-        if (userSessionKey == null) {
-            System.err.println("❌ [БЭКЕНД] Ключ не найден. requesterUsername=[" + requesterUsername
-                    + "] | senderId=" + senderId
-                    + " | ключи в map: " + sessionKeyManager.getAllKeys());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Ошибка безопасности: сессия не найдена");
-        }
 
         List<MessageDto> dtoList = new ArrayList<>();
 
         for (Message msg : history) {
-            // Шифруем текст, если он есть
-            String networkContent = msg.getContent();
-            if (networkContent != null && !networkContent.trim().isEmpty()) {
-                networkContent = encryptionUtil.encrypt(msg.getContent(), userSessionKey);
-            }
-
-            // Собираем DTO
+            // 🚀 ГЛАВНОЕ ИЗМЕНЕНИЕ: Отдаем шифротекст КАК ЕСТЬ, без шифрования на сервере
             MessageDto dto = MessageDto.builder()
                     .id(msg.getId())
-                    .content(networkContent) // Сюда улетает зашифрованный под сессию текст!
+                    .content(msg.getContent()) // Шифротекст от отправителя
                     .timestamp(msg.getTimestamp())
                     .imageUrl(msg.getImageUrl())
                     .status(msg.getStatus())
@@ -332,25 +202,18 @@ public class MessageController {
             dtoList.add(dto);
         }
 
-        System.out.println("🟩 [БЭКЕНД] История успешно зашифрована сессионным ключом для userId: " + senderId + " и отдается. Размер: " + history.size());        // 5. Отдаем зашифрованную историю в сеть!
+        System.out.println("🟩 [БЭКЕНД] История отдана как есть. Размер: " + history.size());
         return ResponseEntity.ok(dtoList);
     }
 
     @MessageMapping("/chat.typing")
-    @Operation(
-            summary = " [WebSocket STOMP] Трансляция статуса печати текста",
-            description = "Вызывается клиентом автоматически при наборе текста в EditText. Пересылает статус (true/false) в персональный топик собеседника в прямом эфире."
-    )
     public void processTyping(@Payload Map<String, Object> payload) {
-        // Вытаскиваем ID участников и булево поле из сокет-конверта
         Long senderId = Long.valueOf(payload.get("senderId").toString());
         Long recipientId = Long.valueOf(payload.get("recipientId").toString());
         Boolean isTyping = (Boolean) payload.get("isTyping");
 
         if (senderId == null || recipientId == null || isTyping == null) return;
 
-        // Пересылаем этот статус напрямую в персональный сокет-топик получателя!
-        // Его мобилка поймает этот микро-пакет и красиво зажжет надпись на экране.
         messagingTemplate.convertAndSend("/topic/chat.typing." + recipientId, Map.of(
                 "senderId", senderId,
                 "isTyping", isTyping

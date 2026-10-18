@@ -22,7 +22,8 @@ public class Message {
     @JoinColumn(name = "recipient_id", nullable = false)
     private User recipient;
 
-    private String content;
+    private String content; // Здесь будет храниться шифротекст от клиента
+    private String contentPreview; // Для пушей (чистый текст, присылаемый клиентом)
     private LocalDateTime timestamp;
     private String imageUrl;
 
