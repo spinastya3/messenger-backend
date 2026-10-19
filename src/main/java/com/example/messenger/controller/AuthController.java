@@ -8,10 +8,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.*;
@@ -68,9 +66,6 @@ public class AuthController {
             String fcmToken = request.get("fcmToken");
             String clientPublicKey = request.get("clientPublicKey");
 
-            System.out.println("🔍 [LOGIN_DEBUG] username=" + username +
-                    ", clientPublicKey=" + (clientPublicKey != null ? "есть (" + clientPublicKey.length() + ")" : "NULL!"));
-
             Map<String, String> response = authService.login(username, password, fcmToken, clientPublicKey);
             return ResponseEntity.ok(response);
 
@@ -115,7 +110,7 @@ public class AuthController {
     }
 
     @Operation(summary = "Обновление публичного ключа пользователя (E2EE)",
-            description = "Принимает публичный ключ клиента и сохраняет его в БД. Сервер больше не делает handshake.")
+            description = "Принимает публичный ключ клиента и сохраняет его в БД (только если ключа ещё нет).")
     @PostMapping("/refresh-session")
     public ResponseEntity<?> refreshSession(
             @RequestBody RefreshSessionRequest request,
@@ -133,10 +128,9 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Публичный ключ не передан"));
             }
 
-            // Сохраняем публичный ключ в БД
+            // 🚀 Сохраняем публичный ключ в БД (только если его ещё нет)
             authService.updatePublicKey(username, clientPublicKey);
 
-            // Возвращаем пустой ответ (клиенту больше не нужен serverPublicKey)
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

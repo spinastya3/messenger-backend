@@ -49,9 +49,9 @@ public class WebSocketEventListener {
             String username = principal.getName();
             int anonymizedId = Math.abs(username.hashCode() % 10000);
 
-            log.info("🟨 [SOCKET-CRYPTO] Ключ для anonymizedId {} запланирован к удалению через 180 сек.", anonymizedId);
+            log.info("👤 [SOCKET] Отключился пользователь: anonymizedId={}", anonymizedId);
         } else {
-            log.warn("🟨 [SOCKET-CRYPTO] Не удалось определить имя пользователя при дисконнекте. Возможно, сессия не была авторизована.");
+            log.warn("🟨 [SOCKET] Не удалось определить имя пользователя при дисконнекте...");
         }
     }
 }

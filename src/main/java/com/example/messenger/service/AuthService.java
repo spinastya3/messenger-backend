@@ -6,10 +6,7 @@ import com.example.messenger.util.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -29,8 +26,8 @@ public class AuthService {
         this.emailService = emailService;
     }
 
-    // Регистрируем пользователя, если логин уникальный
-    public Map<String, String> register(String username, String rawPassword, String email, String fcmToken,  String clientPublicKey) {
+    // Регистрируем пользователя
+    public Map<String, String> register(String username, String rawPassword, String email, String fcmToken, String clientPublicKey) {
 
         Optional.ofNullable(username)
                 .filter(u -> !u.trim().isEmpty())
@@ -60,10 +57,8 @@ public class AuthService {
                 .filter(p -> !p.trim().isEmpty())
                 .orElseThrow(() -> new IllegalArgumentException("Введите пароль!"));
 
-        // Шифруем пароль
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        // Собюираем юзера
         User newUser = User.builder()
                 .username(username)
                 .password(encodedPassword)
@@ -72,14 +67,11 @@ public class AuthService {
                 .publicKey(clientPublicKey)
                 .build();
 
-        // Сохраняем юзера в БД
         userRepository.save(newUser);
-
         emailService.sendWelcomeEmail(email, username);
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "Поздравляю! Вы в ElisMessenger!");
-
         return response;
     }
 
@@ -94,13 +86,18 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Неверный пароль!"));
 
         user.setFcmToken(fcmToken);
-        if (clientPublicKey != null && !clientPublicKey.isEmpty()) {
-            user.setPublicKey(clientPublicKey);
-        }
-        userRepository.save(user);
 
-        System.out.println("🔍 [LOGIN_DEBUG] После save: username=" + username +
-                ", publicKey=" + (user.getPublicKey() != null ? "есть (" + user.getPublicKey().length() + ")" : "NULL!"));
+        // 🚀 ГЛАВНОЕ ИЗМЕНЕНИЕ: НЕ перезаписываем ключ, если он уже есть
+        if (user.getPublicKey() == null || user.getPublicKey().isEmpty()) {
+            if (clientPublicKey != null && !clientPublicKey.isEmpty()) {
+                user.setPublicKey(clientPublicKey);
+                System.out.println("🔑 [E2EE] Первый ключ сохранён для " + username);
+            }
+        } else {
+            System.out.println("🔑 [E2EE] Ключ для " + username + " уже существует, не перезаписываем.");
+        }
+
+        userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getId());
 
@@ -109,16 +106,12 @@ public class AuthService {
         response.put("userId", String.valueOf(user.getId()));
         response.put("message", "С возвращением в ElisMessenger!");
 
-        if (clientPublicKey != null && !clientPublicKey.isEmpty()) {
-            user.setPublicKey(clientPublicKey);
-            userRepository.save(user);
-        }
         return response;
     }
 
-    // Запрашиваем изменение пароля
-    public Map<String, String> requestPasswordReset(String email) {
+    // ... остальные методы (requestPasswordReset, resetPassword, updatePublicKey) без изменений ...
 
+    public Map<String, String> requestPasswordReset(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с такой почтой не зарегистрирован!"));
 
@@ -133,9 +126,7 @@ public class AuthService {
         );
     }
 
-    // Меняем пароль
     public Map<String, String> resetPassword(String email, String code, String newRawPassword) {
-
         Optional.ofNullable(newRawPassword)
                 .filter(p -> !p.trim().isEmpty())
                 .orElseThrow(() -> new IllegalArgumentException("Новый пароль не может быть пустым!"));
@@ -158,8 +149,14 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
+        // 🚀 ГЛАВНОЕ ИЗМЕНЕНИЕ: не перезаписываем, если ключ уже есть
+        if (user.getPublicKey() != null && !user.getPublicKey().isEmpty()) {
+            System.out.println("🔑 [E2EE] Ключ для " + username + " уже существует. Пропускаем обновление.");
+            return;
+        }
+
         user.setPublicKey(publicKey);
         userRepository.save(user);
-        System.out.println("🔑 [E2EE] Публичный ключ обновлён для " + username);
+        System.out.println("🔑 [E2EE] Первый ключ сохранён для " + username);
     }
 }
