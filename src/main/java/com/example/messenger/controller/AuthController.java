@@ -68,6 +68,9 @@ public class AuthController {
             String fcmToken = request.get("fcmToken");
             String clientPublicKey = request.get("clientPublicKey");
 
+            System.out.println("🔍 [LOGIN_DEBUG] username=" + username +
+                    ", clientPublicKey=" + (clientPublicKey != null ? "есть (" + clientPublicKey.length() + ")" : "NULL!"));
+
             Map<String, String> response = authService.login(username, password, fcmToken, clientPublicKey);
             return ResponseEntity.ok(response);
 
