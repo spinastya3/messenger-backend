@@ -99,6 +99,9 @@ public class AuthService {
         }
         userRepository.save(user);
 
+        System.out.println("🔍 [LOGIN_DEBUG] После save: username=" + username +
+                ", publicKey=" + (user.getPublicKey() != null ? "есть (" + user.getPublicKey().length() + ")" : "NULL!"));
+
         String token = jwtUtil.generateToken(user.getUsername(), user.getId());
 
         Map<String, String> response = new HashMap<>();
