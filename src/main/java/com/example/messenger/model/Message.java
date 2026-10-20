@@ -2,49 +2,56 @@ package com.example.messenger.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "messages")
+@Table(name = "messages", indexes = {
+        @Index(name = "idx_msg_chat_created", columnList = "chat_id, timestamp")
+})
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "chat_id", nullable = false)
+    private Long chatId;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
+    // Оставляем для удобства пушей и старого клиента
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "recipient_id", nullable = false)
     private User recipient;
 
-    private String content; // Здесь будет храниться шифротекст от клиента
-    private String contentPreview; // Для пушей (чистый текст, присылаемый клиентом)
-    private LocalDateTime timestamp;
+    @Column(name = "content_preview")
+    private String contentPreview;
+
+    @Column(name = "image_url")
     private String imageUrl;
-    private Long chatId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(
-            name = "status",
-            nullable = true,
-            columnDefinition = "VARCHAR(255) CHECK (status IN ('SENT', 'DELIVERED', 'READ'))"
-    )
+    @Column(name = "timestamp", nullable = false)
+    private LocalDateTime timestamp;
 
-    private MessageStatus status = MessageStatus.SENT;
+    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<MessagePayload> payloads = new ArrayList<>();
 
-    public MessageStatus getStatus() {
-        if (this.status == null) {
-            return MessageStatus.SENT;
-        }
-        return this.status;
+    @PrePersist
+    void onCreate() {
+        if (timestamp == null) timestamp = LocalDateTime.now();
     }
 
-    // Эти методы Джексон автоматически превратит в ключи "senderId" и "senderName" на верхнем уровне JSON!
     @JsonProperty("senderId")
     public Long getSenderId() {
         return sender != null ? sender.getId() : null;

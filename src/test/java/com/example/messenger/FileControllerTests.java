@@ -1,4 +1,4 @@
-package com.example.messenger; // 🟢 Проверь свой бэкенд-пакет!
+package com.example.messenger;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;

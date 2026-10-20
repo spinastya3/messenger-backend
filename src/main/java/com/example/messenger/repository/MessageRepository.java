@@ -1,42 +1,29 @@
 package com.example.messenger.repository;
 
 import com.example.messenger.model.Message;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    // Пагинация 20 сообщений
-    @Query("SELECT m FROM Message m WHERE " +
-            "(m.sender.id = :sId AND m.recipient.id = :rId) OR " +
-            "(m.sender.id = :rId AND m.recipient.id = :sId) " +
-            "ORDER BY m.timestamp DESC")
-    List<Message> findChatHistory(@Param("sId") Long senderId,
-                                  @Param("rId") Long recipientId,
-                                  org.springframework.data.domain.Pageable pageable);
+    // 1. История чата (просто по chatId!)
+    @Query("SELECT m FROM Message m WHERE m.chatId = :chatId ORDER BY m.timestamp DESC")
+    List<Message> findChatHistory(@Param("chatId") Long chatId, Pageable pageable);
 
+    // 2. Список собеседников для профиля (все чаты, где юзер был отправителем или получателем)
     @Query("SELECT DISTINCT CASE WHEN m.sender.id = :userId THEN m.recipient.id ELSE m.sender.id END " +
             "FROM Message m WHERE m.sender.id = :userId OR m.recipient.id = :userId")
     List<Long> findActiveChatBuddyIds(@Param("userId") Long userId);
 
-    // Непрочитанными считаются и SENT, и DELIVERED, и NULL
-    @Query("SELECT m FROM Message m WHERE m.sender.id = :sId AND m.recipient.id = :rId " +
-            "AND (m.status = com.example.messenger.model.MessageStatus.SENT " +
-            "OR m.status = com.example.messenger.model.MessageStatus.DELIVERED " +
-            "OR m.status IS NULL)")
-    List<Message> findUnreadMessages(@Param("sId") Long senderId, @Param("rId") Long recipientId);
-
-    // Метод для поиска только отправленных сообщений (чтобы перевести их в статус ДОСТАВЛЕНО)
-    @Query("SELECT m FROM Message m WHERE m.sender.id = :sId AND m.recipient.id = :rId " +
-            "AND (m.status = com.example.messenger.model.MessageStatus.SENT OR m.status IS NULL)")
-    List<Message> findSentMessages(@Param("sId") Long senderId, @Param("rId") Long recipientId);
-
-    // Метод для поиска фото/видео, если его imageUrl заканчивается на имя запрашиваемого файла
+    // 3. Поиск фото/видео по имени файла
     @Query("SELECT m FROM Message m WHERE m.imageUrl LIKE %:filename")
     Optional<Message> findByImageUrlEndingWith(@Param("filename") String filename);
+
+    // Найти самое последнее сообщение в чате (для превью)
+    Optional<Message> findTopByChatIdOrderByTimestampDesc(Long chatId);
 }
-
-

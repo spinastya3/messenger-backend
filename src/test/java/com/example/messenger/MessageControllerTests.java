@@ -2,9 +2,9 @@ package com.example.messenger;
 
 import com.example.messenger.controller.MessageController;
 import com.example.messenger.dto.MessageDto;
-import com.example.messenger.model.Message;
-import com.example.messenger.model.MessageStatus;
-import com.example.messenger.model.User;
+import com.example.messenger.dto.SendMessageRequest;
+import com.example.messenger.model.*;
+import com.example.messenger.repository.MessagePayloadRepository;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.service.MessageService;
@@ -19,13 +19,12 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,22 +32,19 @@ public class MessageControllerTests {
 
     private MessageController messageController;
 
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
-    @Mock
-    private MessageRepository messageRepository;
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private PushNotificationService pushNotificationService;
-    @Mock
-    private MessageService messageService;
+    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock private MessageRepository messageRepository;
+    @Mock private MessagePayloadRepository payloadRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private PushNotificationService pushNotificationService;
+    @Mock private MessageService messageService;
 
     @BeforeEach
     public void setUp() {
         messageController = new MessageController(
                 messagingTemplate,
                 messageRepository,
+                payloadRepository,
                 userRepository,
                 pushNotificationService,
                 messageService
@@ -62,6 +58,7 @@ public class MessageControllerTests {
         LocalDateTime expectedTime = LocalDateTime.of(2026, 6, 30, 14, 0, 0);
 
         Principal mockPrincipal = mock(Principal.class);
+        when(mockPrincipal.getName()).thenReturn("Гарри");
 
         User sender = User.builder().id(testSenderId).username("Гарри").build();
         User recipient = User.builder().id(testRecipientId).username("Рон").build();
@@ -70,103 +67,109 @@ public class MessageControllerTests {
         testMessage.setId(555L);
         testMessage.setSender(sender);
         testMessage.setRecipient(recipient);
-        testMessage.setContent("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ");
         testMessage.setTimestamp(expectedTime);
-        testMessage.setStatus(MessageStatus.SENT);
+
+        MessagePayload payload = MessagePayload.builder()
+                .message(testMessage)
+                .recipient(sender) // Пейлоад для Гарри
+                .encryptedPayload("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ")
+                .status(MessageStatus.SENT)
+                .build();
+
+        testMessage.setPayloads(new ArrayList<>(List.of(payload)));
 
         List<Message> testHistory = List.of(testMessage);
 
-        // Мокаем ТОЛЬКО метод, который вызывается
+        when(userRepository.findByUsername("Гарри")).thenReturn(Optional.of(sender));
         when(messageService.getChatHistory(eq(testSenderId), eq(testRecipientId), anyInt(), anyInt()))
                 .thenReturn(testHistory);
 
-        // Вызов контроллера
         ResponseEntity<?> response = messageController.getChatHistory(testSenderId, testRecipientId, 0, 20, mockPrincipal);
 
-        assertNotNull(response.getBody(), "Тело ответа не должно быть null");
+        assertNotNull(response.getBody());
         List<MessageDto> result = (List<MessageDto>) response.getBody();
 
-        assertAll("Проверка выгрузки истории чата через DTO (E2EE)",
-                () -> assertEquals(1, result.size(), "В истории не одно сообщение"),
-                () -> assertEquals("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ", result.get(0).getContent(), "Сервер не должен менять шифротекст"),
-                () -> assertEquals(expectedTime, result.get(0).getTimestamp(), "Время сообщения не совпадает"),
-                () -> assertEquals(testSenderId, result.get(0).getSenderId(), "ID отправителя в DTO не совпадает")
+        assertAll("Проверка выгрузки истории",
+                () -> assertEquals(1, result.size()),
+                () -> assertEquals("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ", result.get(0).getContent()),
+                () -> assertEquals(expectedTime, result.get(0).getTimestamp()),
+                () -> assertEquals(testSenderId, result.get(0).getSenderId())
         );
     }
+
     @Test
-    public void processMessage_ShouldSetCurrentTimestampAndSave() {
-        User senderUser = new User();
-        senderUser.setId(10L);
-        senderUser.setUsername("гарри");
+    public void processMessage_ShouldSaveAndSendPayloads() {
+        User senderUser = User.builder().id(10L).username("гарри").build();
+        User recipientUser = User.builder().id(20L).username("гермиона").build();
 
-        User recipientUser = new User();
-        recipientUser.setId(20L);
-        recipientUser.setUsername("гермиона");
+        SendMessageRequest req = new SendMessageRequest();
+        req.setRecipientId(20L);
+        req.setEncryptedForRecipient("ШИФР_ДЛЯ_ГЕРМИОНЫ");
+        req.setEncryptedForSender("ШИФР_ДЛЯ_ГАРРИ");
 
-        Message localTestMessage = new Message();
-        localTestMessage.setSender(senderUser);
-        localTestMessage.setRecipient(recipientUser);
-        localTestMessage.setContent("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ");
+        Principal mockPrincipal = mock(Principal.class);
+        when(mockPrincipal.getName()).thenReturn("гарри");
 
-        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));
-        when(userRepository.findById(eq(20L))).thenReturn(Optional.of(recipientUser));
-        when(messageRepository.save(any(Message.class))).then(org.mockito.AdditionalAnswers.returnsFirstArg());
+        Message savedMessage = new Message();
+        savedMessage.setId(100L);
+        savedMessage.setSender(senderUser);
+        savedMessage.setRecipient(recipientUser);
+        savedMessage.setTimestamp(LocalDateTime.now());
 
-        LocalDateTime testStartTime = LocalDateTime.now().minusSeconds(1);
+        // Мокаем поиск юзера
+        when(userRepository.findByUsername("гарри")).thenReturn(Optional.of(senderUser));
+        // Мокаем сервис отправки
+        when(messageService.sendMessage(eq(10L), any(SendMessageRequest.class))).thenReturn(savedMessage);
 
-        // Делаем выстрел в контроллер!
-        messageController.processMessage(localTestMessage);
+        // Вызываем метод
+        messageController.processMessage(req, mockPrincipal);
 
-        LocalDateTime messageTime = localTestMessage.getTimestamp();
+        // Проверяем, что сервис вызвался
+        verify(messageService).sendMessage(eq(10L), any(SendMessageRequest.class));
 
-        assertAll("Проверка генерации живого тайминга при отправке",
-                () -> assertNotNull(messageTime, "Сервер обязан сгенерировать timestamp!"),
-                () -> assertTrue(messageTime.isAfter(testStartTime), "Тайминг должен быть актуальным"),
-                // 🚀 ГЛАВНОЕ: Сервер НЕ расшифровывает!
-                () -> assertEquals("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ", localTestMessage.getContent(), "Сервер не должен менять шифротекст")
-        );
-
-        // Проверяем, что сообщение разослано в сокеты (получателю и отправителю)
+        // Проверяем, что сообщение разослано в сокеты (2 вызова)
         verify(messagingTemplate, times(2)).convertAndSend(anyString(), any(Message.class));
     }
 
     @Test
     public void shouldSendPushNotificationWhenMessageArrives() {
-        User senderUser = new User();
-        senderUser.setId(10L);
-        senderUser.setUsername("гарри");
+        User senderUser = User.builder().id(10L).username("гарри").build();
+        User recipientUser = User.builder().id(20L).username("гермиона").build();
+        recipientUser.setFcmToken("real_fcm_token_666");
 
-        User recipientUser = new User();
-        recipientUser.setId(20L);
-        recipientUser.setUsername("гермиона");
+        SendMessageRequest req = new SendMessageRequest();
+        req.setRecipientId(20L);
+        req.setEncryptedForRecipient("ШИФР");
+        req.setEncryptedForSender("ШИФР");
+        req.setContentPreview("Привет!"); // Текст для пуша
 
-        User databaseRecipient = new User();
-        databaseRecipient.setId(20L);
-        databaseRecipient.setUsername("гермиона");
-        databaseRecipient.setFcmToken("real_fcm_token_666");
+        Principal mockPrincipal = mock(Principal.class);
+        when(mockPrincipal.getName()).thenReturn("гарри");
 
-        Message incomingMessage = new Message();
-        incomingMessage.setSender(senderUser);
-        incomingMessage.setRecipient(recipientUser);
-        incomingMessage.setContent("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ");
+        Message savedMessage = new Message();
+        savedMessage.setId(100L);
+        savedMessage.setSender(senderUser);
+        savedMessage.setRecipient(recipientUser);
+        savedMessage.setTimestamp(LocalDateTime.now());
 
-        when(messageRepository.save(any(Message.class))).then(org.mockito.AdditionalAnswers.returnsFirstArg());
-        when(userRepository.findById(eq(20L))).thenReturn(Optional.of(databaseRecipient));
-        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(senderUser));
+        // Мокаем поиск юзера (отправителя)
+        when(userRepository.findByUsername("гарри")).thenReturn(Optional.of(senderUser));
+        // Мокаем сервис отправки
+        when(messageService.sendMessage(eq(10L), any(SendMessageRequest.class))).thenReturn(savedMessage);
 
-        // Делаем выстрел в контроллер!
-        messageController.processMessage(incomingMessage);
+        // 🚀 ДЕЛАЕМ МОК ЛЕНИВЫМ (lenient), чтобы не падало, если вызов не произошел
+        lenient().when(userRepository.findById(20L)).thenReturn(Optional.of(recipientUser));
 
-        assertNotNull(incomingMessage.getTimestamp(), "Сообщение успешно обработано сервером");
+        // Вызываем метод
+        messageController.processMessage(req, mockPrincipal);
 
-        // 🚀 ГЛАВНОЕ: Пуш летит с заглушкой
-        verify(pushNotificationService)
-                .sendPushNotification(
-                        eq("real_fcm_token_666"),
-                        eq("гарри"),
-                        eq("Новое сообщение"), // Заглушка
-                        eq(10L),
-                        eq("гарри")
-                );
+        // Проверяем, что пуш вызвался
+        verify(pushNotificationService).sendPushNotification(
+                eq("real_fcm_token_666"),
+                eq("гарри"),
+                eq("Привет!"),
+                eq(10L),
+                eq("гарри")
+        );
     }
 }

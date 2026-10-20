@@ -1,7 +1,11 @@
-package com.example.messenger.service;
+package com.example.messenger;
 
+import com.example.messenger.model.PasswordResetCode;
 import com.example.messenger.model.User;
+import com.example.messenger.repository.PasswordResetCodeRepository;
 import com.example.messenger.repository.UserRepository;
+import com.example.messenger.service.AuthService;
+import com.example.messenger.service.EmailService;
 import com.example.messenger.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,12 +14,14 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 class AuthServiceTests {
@@ -24,13 +30,17 @@ class AuthServiceTests {
     private UserRepository userRepository;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder; // Не забудь импорт org.springframework.security.crypto.password.PasswordEncoder
 
     @Mock
     private JwtUtil jwtUtil;
 
     @Mock
     private EmailService emailService;
+
+    // 🚀 ДОБАВИЛИ: Мок для нового репозитория
+    @Mock
+    private PasswordResetCodeRepository resetCodeRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -53,13 +63,13 @@ class AuthServiceTests {
         when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
         when(userRepository.existsByEmail(email)).thenReturn(false);
         when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
+        when(jwtUtil.generateToken(username, null)).thenReturn("mocked_jwt_token"); // Заглушка для токена
 
         Map<String, String> response = authService.register(username, rawPassword, email, MOCK_FCM_TOKEN, mockClientPublicKey);
 
         assertNotNull(response);
         assertEquals("Поздравляю! Вы в ElisMessenger!", response.get("message"));
 
-        // 🚀 ОДНА проверка: save вызван ровно 1 раз, и в объекте есть публичный ключ
         verify(userRepository, times(1)).save(argThat(user ->
                 user.getPublicKey() != null && user.getPublicKey().equals(mockClientPublicKey)
         ));
@@ -70,7 +80,7 @@ class AuthServiceTests {
         String emailWithoutAt = "garrypotter.com";
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("Гарри", "test", emailWithoutAt, MOCK_FCM_TOKEN, null)
+                authService.register("Гарри", "test", emailWithoutAt, MOCK_FCM_TOKEN, "some_key")
         );
         assertEquals("Введите корректный Email!", exception.getMessage());
     }
@@ -81,7 +91,7 @@ class AuthServiceTests {
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(new User()));
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register(username, "test", "test@mail.com", MOCK_FCM_TOKEN, null)
+                authService.register(username, "test", "test@mail.com", MOCK_FCM_TOKEN, "some_key")
         );
         assertEquals("Пользователь с таким логином уже существует!", exception.getMessage());
     }
@@ -103,7 +113,6 @@ class AuthServiceTests {
         assertEquals("7", response.get("userId"));
         assertEquals("С возвращением в ElisMessenger!", response.get("message"));
 
-        // 🚀 Проверяем, что публичный ключ сохранился в User (atLeastOnce, потому что save вызывается для FCM и для ключа)
         verify(userRepository, atLeastOnce()).save(argThat(user ->
                 user.getPublicKey() != null && user.getPublicKey().equals(mockClientPublicKey)
         ));
@@ -118,7 +127,7 @@ class AuthServiceTests {
         when(passwordEncoder.matches("wrong_password", "correct_hash")).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.login(username, "wrong_password", MOCK_FCM_TOKEN, null)
+                authService.login(username, "wrong_password", MOCK_FCM_TOKEN, "some_key")
         );
         assertEquals("Неверный пароль!", exception.getMessage());
     }
@@ -126,7 +135,7 @@ class AuthServiceTests {
     @Test
     void register_ThrowsException_WhenFieldsAreBlank() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("   ", "test", "test@mail.com", MOCK_FCM_TOKEN, null)
+                authService.register("   ", "test", "test@mail.com", MOCK_FCM_TOKEN, "some_key")
         );
         assertEquals("Введите логин!", exception.getMessage());
     }
@@ -138,32 +147,64 @@ class AuthServiceTests {
         when(userRepository.existsByEmail(email)).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.register("new_user", "test", email, MOCK_FCM_TOKEN, null)
+                authService.register("new_user", "test", email, MOCK_FCM_TOKEN, "some_key")
         );
         assertEquals("Пользователь с такой почтой уже существует!", exception.getMessage());
     }
 
+    // 🚀 ПЕРЕПИСАН: Тест на запрос сброса пароля
     @Test
     void requestPasswordReset_Success() {
         String email = "mama@mail.com";
         User mockUser = User.builder().username("mama").email(email).build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
 
+        // Мокаем сохранение кода
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_code");
+
         Map<String, String> response = authService.requestPasswordReset(email);
 
         assertNotNull(response);
         assertEquals("Код восстановления отправлен на вашу почту!", response.get("message"));
-        assertNotNull(response.get("debugCode"));
+
+        // 🚀 Проверяем, что debugCode УБРАН из ответа
+        assertNull(response.get("debugCode"), "Debug code должен отсутствовать в целях безопасности");
+
+        // Проверяем, что код сохранился в БД
+        verify(resetCodeRepository, times(1)).save(any(PasswordResetCode.class));
+        verify(emailService, times(1)).sendResetCodeEmail(eq(email), eq("mama"), anyString());
     }
 
+    // 🚀 ПЕРЕПИСАН: Тест на неверный код сброса
     @Test
     void resetPassword_ThrowsException_WhenCodeIsInvalid() {
         String email = "test@mail.com";
         String wrongCode = "000000";
+        String newPassword = "new_password123";
+
+        User mockUser = User.builder().email(email).build();
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        // Создаем фейковый код в БД
+        PasswordResetCode fakeCode = PasswordResetCode.builder()
+                .user(mockUser)
+                .codeHash("hashed_correct_code")
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .attempts(0)
+                .build();
+
+        when(resetCodeRepository.findTopByUserOrderByCreatedAtDesc(mockUser)).thenReturn(Optional.of(fakeCode));
+
+        // Пароль не совпадает
+        when(passwordEncoder.matches(wrongCode, "hashed_correct_code")).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                authService.resetPassword(email, wrongCode, "new_password123")
+                authService.resetPassword(email, wrongCode, newPassword)
         );
-        assertEquals("Неверный или просроченный код восстановления!", exception.getMessage());
+        assertEquals("Неверный код восстановления!", exception.getMessage());
+
+        // Проверяем, что счетчик попыток увеличился
+        assertEquals(1, fakeCode.getAttempts());
+        verify(resetCodeRepository, times(1)).save(fakeCode);
     }
 }

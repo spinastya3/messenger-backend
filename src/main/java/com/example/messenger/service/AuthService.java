@@ -1,29 +1,37 @@
 package com.example.messenger.service;
 
+import com.example.messenger.model.PasswordResetCode;
 import com.example.messenger.model.User;
+import com.example.messenger.repository.PasswordResetCodeRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
+import jakarta.transaction.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetCodeRepository resetCodeRepository;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
-    private final Map<String, String> resetCodesCache = new ConcurrentHashMap<>();
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil, EmailService emailService) {
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil,
+                       EmailService emailService,
+                       PasswordResetCodeRepository resetCodeRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
+        this.resetCodeRepository = resetCodeRepository;
     }
 
     // Регистрируем пользователя
@@ -57,6 +65,11 @@ public class AuthService {
                 .filter(p -> !p.trim().isEmpty())
                 .orElseThrow(() -> new IllegalArgumentException("Введите пароль!"));
 
+        Optional.ofNullable(clientPublicKey)
+                .filter(k -> !k.trim().isEmpty())
+                .orElseThrow(() -> new IllegalArgumentException("Публичный ключ обязателен при регистрации!"));
+
+
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
         User newUser = User.builder()
@@ -68,10 +81,19 @@ public class AuthService {
                 .build();
 
         userRepository.save(newUser);
-        emailService.sendWelcomeEmail(email, username);
+
+        String token = jwtUtil.generateToken(newUser.getUsername(), newUser.getId());
+
+        try {
+            emailService.sendWelcomeEmail(email, username);
+        } catch (Exception e) {
+            System.err.println("⚠️ Welcome email failed: " + e.getMessage());
+        }
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "Поздравляю! Вы в ElisMessenger!");
+        response.put("token", token);
+        response.put("userId", String.valueOf(newUser.getId()));
         return response;
     }
 
@@ -106,46 +128,83 @@ public class AuthService {
         response.put("userId", String.valueOf(user.getId()));
         response.put("message", "С возвращением в ElisMessenger!");
 
+        if (user.getPublicKey() != null && !user.getPublicKey().isEmpty()) {
+            response.put("publicKey", user.getPublicKey());
+        }
+
         return response;
     }
 
-    // ... остальные методы (requestPasswordReset, resetPassword, updatePublicKey) без изменений ...
-
+    @Transactional
     public Map<String, String> requestPasswordReset(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь с такой почтой не зарегистрирован!"));
 
-        String resetCode = String.format("%06d", new Random().nextInt(1000000));
-        resetCodesCache.put(email, resetCode);
+        // Удаляем старые коды этого юзера
+        resetCodeRepository.deleteAllByUser(user);
 
-        emailService.sendResetCodeEmail(email, user.getUsername(), resetCode);
+        String plainCode = String.format("%06d", new Random().nextInt(1_000_000));
 
-        return Map.of(
-                "message", "Код восстановления отправлен на вашу почту!",
-                "debugCode", resetCode
-        );
+        PasswordResetCode code = PasswordResetCode.builder()
+                .user(user)
+                .codeHash(passwordEncoder.encode(plainCode)) // хэшируем!
+                .expiresAt(LocalDateTime.now().plusMinutes(10)) // TTL 10 минут
+                .attempts(0)
+                .build();
+        resetCodeRepository.save(code);
+
+        emailService.sendResetCodeEmail(email, user.getUsername(), plainCode);
+
+        // ⚠️ debugCode убран (на реальном сервере это уязвимость)
+        return Map.of("message", "Код восстановления отправлен на вашу почту!");
     }
 
+    @Transactional
     public Map<String, String> resetPassword(String email, String code, String newRawPassword) {
         Optional.ofNullable(newRawPassword)
                 .filter(p -> !p.trim().isEmpty())
                 .orElseThrow(() -> new IllegalArgumentException("Новый пароль не может быть пустым!"));
 
-        Optional.ofNullable(resetCodesCache.get(email))
-                .filter(c -> c.equals(code))
-                .orElseThrow(() -> new IllegalArgumentException("Неверный или просроченный код восстановления!"));
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден!"));
 
+        PasswordResetCode resetCode = resetCodeRepository
+                .findTopByUserOrderByCreatedAtDesc(user)
+                .orElseThrow(() -> new IllegalArgumentException("Код не запрашивался или просрочен!"));
+
+        // Проверка TTL
+        if (resetCode.getExpiresAt().isBefore(LocalDateTime.now())) {
+            resetCodeRepository.delete(resetCode);
+            throw new IllegalArgumentException("Код просрочен. Запросите новый.");
+        }
+
+        // Лимит попыток (брутфорс)
+        if (resetCode.getAttempts() >= 5) {
+            resetCodeRepository.delete(resetCode);
+            throw new IllegalArgumentException("Слишком много попыток. Запросите новый код.");
+        }
+
+        // Проверка кода
+        if (!passwordEncoder.matches(code, resetCode.getCodeHash())) {
+            resetCode.setAttempts(resetCode.getAttempts() + 1);
+            resetCodeRepository.save(resetCode);
+            throw new IllegalArgumentException("Неверный код восстановления!");
+        }
+
+        // Успех
         user.setPassword(passwordEncoder.encode(newRawPassword));
         userRepository.save(user);
-        resetCodesCache.remove(email);
+        resetCodeRepository.deleteAllByUser(user);
 
         return Map.of("message", "Пароль успешно изменен! Войдите с новым паролем.");
     }
 
     public void updatePublicKey(String username, String publicKey) {
+
+        if (publicKey == null || publicKey.isBlank()) {
+            throw new IllegalArgumentException("Публичный ключ не передан");
+        }
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
@@ -158,5 +217,14 @@ public class AuthService {
         user.setPublicKey(publicKey);
         userRepository.save(user);
         System.out.println("🔑 [E2EE] Первый ключ сохранён для " + username);
+    }
+
+    @Scheduled(fixedDelay = 3_600_000)
+    @Transactional
+    public void cleanupExpiredResetCodes() {
+        int deleted = resetCodeRepository.deleteExpired(LocalDateTime.now());
+        if (deleted > 0) {
+            System.out.println("🧹 Удалено просроченных reset-кодов: " + deleted);
+        }
     }
 }

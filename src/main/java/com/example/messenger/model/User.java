@@ -1,10 +1,7 @@
 package com.example.messenger.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -12,7 +9,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Entity
-@Table(name = "app_users") // Создаем таблицу пользователей
+@Table(name = "app_users")
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,28 +18,32 @@ public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // ID пользователя он же первичный ключ
+    private Long id;
 
     @Column(unique = true, nullable = false)
-    private String username; // Имя
+    private String username;
 
     @Column(nullable = false)
-    private String password; // Пароль
+    private String password;
 
     @Column(unique = true)
-    private String email; // Email
+    private String email;
 
-    private String fcmToken; // Токен дла пуша
+    private String fcmToken;
 
+    // Оставляем для обратной совместимости (fallback)
     @Column(name = "public_key", columnDefinition = "TEXT", nullable = true)
     private String publicKey;
 
-    @Override //  всех пользователей одна доступная роль
+    // 🚀 НОВОЕ: список устройств пользователя
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<UserDevice> devices;
+
+    @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(() -> "ROLE_USER");
     }
 
-    // Пароли не надо менять, блокировать, поддтверждать
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
