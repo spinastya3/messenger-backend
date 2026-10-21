@@ -200,7 +200,6 @@ public class AuthService {
     }
 
     public void updatePublicKey(String username, String publicKey) {
-
         if (publicKey == null || publicKey.isBlank()) {
             throw new IllegalArgumentException("Публичный ключ не передан");
         }
@@ -208,15 +207,10 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        // 🚀 ГЛАВНОЕ ИЗМЕНЕНИЕ: не перезаписываем, если ключ уже есть
-        if (user.getPublicKey() != null && !user.getPublicKey().isEmpty()) {
-            System.out.println("🔑 [E2EE] Ключ для " + username + " уже существует. Пропускаем обновление.");
-            return;
-        }
-
+        // 🚀 ПРИНУДИТЕЛЬНО ПЕРЕЗАПИСЫВАЕМ КЛЮЧ
         user.setPublicKey(publicKey);
         userRepository.save(user);
-        System.out.println("🔑 [E2EE] Первый ключ сохранён для " + username);
+        System.out.println("🔑 [E2EE] Ключ для " + username + " ПРИНУДИТЕЛЬНО ОБНОВЛЕН.");
     }
 
     @Scheduled(fixedDelay = 3_600_000)
