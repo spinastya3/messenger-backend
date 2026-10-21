@@ -6,9 +6,12 @@ import com.example.messenger.repository.PasswordResetCodeRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
 import jakarta.transaction.Transactional;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -199,6 +202,7 @@ public class AuthService {
         return Map.of("message", "Пароль успешно изменен! Войдите с новым паролем.");
     }
 
+    @Transactional
     public void updatePublicKey(String username, String publicKey) {
         if (publicKey == null || publicKey.isBlank()) {
             throw new IllegalArgumentException("Публичный ключ не передан");
@@ -220,5 +224,13 @@ public class AuthService {
         if (deleted > 0) {
             System.out.println("🧹 Удалено просроченных reset-кодов: " + deleted);
         }
+    }
+
+    @PostMapping("/debug/reset-key/{username}")
+    public ResponseEntity<?> resetKey(@PathVariable String username) {
+        User user = userRepository.findByUsername(username).orElseThrow();
+        user.setPublicKey(null);
+        userRepository.save(user);
+        return ResponseEntity.ok("Ключ для " + username + " сброшен. Зайдите в приложение заново.");
     }
 }
