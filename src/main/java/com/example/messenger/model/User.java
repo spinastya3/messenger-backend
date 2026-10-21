@@ -1,5 +1,6 @@
 package com.example.messenger.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -37,6 +38,7 @@ public class User implements UserDetails {
 
     // 🚀 НОВОЕ: список устройств пользователя
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<UserDevice> devices;
 
     @Override
