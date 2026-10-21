@@ -1,4 +1,4 @@
-package com.example.messenger.config;
+package com.example.messenger.config; // Укажи свой пакет
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,44 +25,38 @@ public class SecurityConfig {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
-    // Шифруем пароль по алгоритму BCrypt
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Запрос токена
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity https) throws Exception {
         https
-                // Включаем нашу централизованную настройку CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Отключаем защиту с помощью кук (так как у нас токены)
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // Настраиваем правила доступа
                 .authorizeHttpRequests(auth -> auth
+                        // Разрешаем всё, что связано с аутентификацией (логин, регистрация)
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Разрешаем WebSocket (для STOMP)
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/api/users/*/public-key").authenticated() // 🚀 Разрешаем авторизованным
-                        .requestMatchers("/api/files/**").authenticated()
+                        // 🚀 Разрешаем получение публичного ключа (он не секретный)
+                        .requestMatchers("/api/users/*/public-key").permitAll()
+                        // 🚀 Разрешаем поиск пользователей (или оставь authenticated, если хочешь защитить)
+                        .requestMatchers("/api/users/search").authenticated()
+                        // Всё остальное (включая active-chats) требует токен
                         .anyRequest().authenticated()
                 )
+                // 🚀 ВАЖНО: Убедись, что фильтр JWT добавлен ДО UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return https.build();
     }
 
-    // Централизованная настройка CORS для всего приложения
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        // Пока вы разрабатываете мобилку, оставляем "*".
-        // Как только появится сайт, замените "*" на адрес вашего сайта, например: "https://my-messenger.ru"
         configuration.setAllowedOrigins(List.of("*"));
-
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));

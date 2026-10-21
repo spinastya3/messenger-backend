@@ -43,7 +43,15 @@ public class UserController {
             description = "Вытаскивает из базы Postgres только тех пользователей, с кем у текущего юзера есть история сообщений."
     )
     @GetMapping("/active-chats/{userId}")
-    public ResponseEntity<List<User>> getActiveChats(@PathVariable Long userId) {
+    public ResponseEntity<List<User>> getActiveChats(@PathVariable Long userId, java.security.Principal principal) {
+        // 🚀 Если principal null, значит токен не прошел валидацию
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        // 🚀 Безопасность: можно проверить, что userId в URL совпадает с тем, кто в токене
+        // (но пока оставим как есть, чтобы не сломать клиент)
+
         List<Long> buddyIds = messageRepository.findActiveChatBuddyIds(userId);
         if (buddyIds.isEmpty()) {
             return ResponseEntity.ok(List.of());

@@ -1,4 +1,4 @@
-package com.example.messenger.config;
+package com.example.messenger.config; // Укажи свой пакет
 
 import com.example.messenger.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -31,33 +31,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7); // Отрезаем слово "Bearer " (7 символов)
+            String token = authHeader.substring(7);
 
             try {
-                // Извлекаем имя пользователя из токена с помощью твоей утилиты JwtUtil!
                 String username = jwtUtil.extractUsername(token);
+                System.out.println("🛡️ [JWT FILTER] Токен валиден. Пользователь: " + username);
 
-                // Если имя на месте, а в текущем потоке Спринга авторизация еще не выставлена
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                    // Собираем легальный системный токен Спринг-Секьюрити с ролью ROLE_USER
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             username, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
                     );
-
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    // 🔥 ГЛАВНЫЙ КЛЮЧ: Укладываем авторизацию в системный контекст!
-                    // Теперь Спринг официально признаёт этот запрос легальным!
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    System.out.println("🛡️ [JWT FILTER] Аутентификация установлена в контекст.");
                 }
             } catch (Exception e) {
-                // Если токен протух или кривой — просто логируем, вышибала разберётся сам
-                System.err.println("❌ Ошибка валидации токена в фильтре: " + e.getMessage());
+                System.err.println("❌ [JWT FILTER] Ошибка валидации токена: " + e.getMessage());
             }
+        } else {
+            System.err.println("❌ [JWT FILTER] Заголовок Authorization отсутствует или не начинается с Bearer");
         }
 
-        // Пропускаем запрос дальше по цепочке фильтров
         filterChain.doFilter(request, response);
     }
 }
