@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/*/public-key").permitAll()
                         // 🚀 Разрешаем поиск пользователей (или оставь authenticated, если хочешь защитить)
                         .requestMatchers("/api/users/search").authenticated()
+                        .requestMatchers("/api/auth/debug/**").permitAll()
                         // Всё остальное (включая active-chats) требует токен
                         .anyRequest().authenticated()
                 )

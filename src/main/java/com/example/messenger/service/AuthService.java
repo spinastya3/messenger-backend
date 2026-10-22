@@ -226,11 +226,12 @@ public class AuthService {
         }
     }
 
-    @PostMapping("/debug/reset-key/{username}")
-    public ResponseEntity<?> resetKey(@PathVariable String username) {
-        User user = userRepository.findByUsername(username).orElseThrow();
+    @Transactional
+    public void resetKeyForUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
         user.setPublicKey(null);
         userRepository.save(user);
-        return ResponseEntity.ok("Ключ для " + username + " сброшен. Зайдите в приложение заново.");
+        System.out.println("🧹 [E2EE] Ключ для " + username + " обнулен вручную.");
     }
 }

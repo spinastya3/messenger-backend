@@ -136,4 +136,14 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/debug/reset-key")
+    public ResponseEntity<?> resetKey(@RequestParam String username) {
+        try {
+            authService.resetKeyForUser(username); // Вызываем метод из сервиса
+            return ResponseEntity.ok(Map.of("message", "Ключ для " + username + " успешно сброшен (null)"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
