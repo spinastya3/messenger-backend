@@ -1,7 +1,6 @@
 package com.example.messenger.repository;
 
 import com.example.messenger.model.MessagePayload;
-import com.example.messenger.model.MessageStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,4 +28,7 @@ public interface MessagePayloadRepository extends JpaRepository<MessagePayload, 
             "AND p.message.sender.id = :senderId " +
             "AND p.status IN ('SENT', 'DELIVERED')")
     long countUnread(@Param("senderId") Long senderId, @Param("recipientId") Long recipientId);
+
+    @Query("SELECT p FROM MessagePayload p WHERE p.message.id IN :messageIds AND p.recipient.id = :recipientId")
+    List<MessagePayload> findPayloadsForUser(@Param("messageIds") List<Long> messageIds, @Param("recipientId") Long recipientId);
 }

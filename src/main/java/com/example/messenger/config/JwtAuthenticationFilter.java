@@ -1,4 +1,4 @@
-package com.example.messenger.config; // Укажи свой пакет
+package com.example.messenger.config;
 
 import com.example.messenger.util.JwtUtil;
 import jakarta.servlet.FilterChain;

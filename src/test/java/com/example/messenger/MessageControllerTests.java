@@ -61,29 +61,28 @@ public class MessageControllerTests {
         when(mockPrincipal.getName()).thenReturn("Гарри");
 
         User sender = User.builder().id(testSenderId).username("Гарри").build();
-        User recipient = User.builder().id(testRecipientId).username("Рон").build();
 
-        Message testMessage = new Message();
-        testMessage.setId(555L);
-        testMessage.setSender(sender);
-        testMessage.setRecipient(recipient);
-        testMessage.setTimestamp(expectedTime);
-
-        MessagePayload payload = MessagePayload.builder()
-                .message(testMessage)
-                .recipient(sender) // Пейлоад для Гарри
-                .encryptedPayload("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ")
+        // 🚀 Теперь сервис возвращает List<MessageDto>, а не List<Message>
+        MessageDto testDto = MessageDto.builder()
+                .id(555L)
+                .senderId(testSenderId)
+                .senderName("Гарри")
+                .recipientId(testRecipientId)
+                .content("ЗАШИФРОВАННЫЙ_ТЕКСТ_ОТ_МОБИЛКИ")
+                .timestamp(expectedTime)
                 .status(MessageStatus.SENT)
                 .build();
 
-        testMessage.setPayloads(new ArrayList<>(List.of(payload)));
+        List<MessageDto> testHistory = List.of(testDto);
 
-        List<Message> testHistory = List.of(testMessage);
-
+        // Мокаем поиск юзера
         when(userRepository.findByUsername("Гарри")).thenReturn(Optional.of(sender));
+
+        // Мокаем сервис — он теперь возвращает DTO!
         when(messageService.getChatHistory(eq(testSenderId), eq(testRecipientId), anyInt(), anyInt()))
                 .thenReturn(testHistory);
 
+        // Вызов контроллера
         ResponseEntity<?> response = messageController.getChatHistory(testSenderId, testRecipientId, 0, 20, mockPrincipal);
 
         assertNotNull(response.getBody());

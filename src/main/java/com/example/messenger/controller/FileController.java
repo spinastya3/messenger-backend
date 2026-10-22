@@ -1,6 +1,5 @@
 package com.example.messenger.controller;
 
-import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.service.FileSecurityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

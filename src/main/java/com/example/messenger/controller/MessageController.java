@@ -11,7 +11,6 @@ import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.service.MessageService;
 import com.example.messenger.service.PushNotificationService;
-import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +20,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -141,44 +138,22 @@ public class MessageController {
 
     @GetMapping("/api/chat/history")
     public ResponseEntity<?> getChatHistory(
-            @RequestParam Long senderId, // Оставляем для совместимости с клиентом, но не используем
+            @RequestParam Long senderId,
             @RequestParam Long recipientId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Principal principal) {
 
-        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Не авторизован");
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Не авторизован");
+        }
 
         User currentUser = userRepository.findByUsername(principal.getName()).orElseThrow();
-        List<Message> history = messageService.getChatHistory(currentUser.getId(), recipientId, page, size);
-        List<MessageDto> dtoList = new ArrayList<>();
 
-        for (Message msg : history) {
-            String encryptedContent = "ENCRYPTED_DATA_NOT_FOUND";
-            MessageStatus statusForMe = MessageStatus.READ;
+        // 🚀 Сервис сам соберет DTO!
+        List<MessageDto> history = messageService.getChatHistory(currentUser.getId(), recipientId, page, size);
 
-            if (msg.getPayloads() != null) {
-                for (MessagePayload p : msg.getPayloads()) {
-                    if (p.getRecipient().getId().equals(currentUser.getId())) {
-                        encryptedContent = p.getEncryptedPayload();
-                        statusForMe = p.getStatus();
-                        break;
-                    }
-                }
-            }
-
-            dtoList.add(MessageDto.builder()
-                    .id(msg.getId())
-                    .content(encryptedContent)
-                    .timestamp(msg.getTimestamp())
-                    .imageUrl(msg.getImageUrl())
-                    .status(statusForMe)
-                    .senderId(msg.getSenderId())
-                    .senderName(msg.getSenderName())
-                    .recipientId(msg.getRecipientId())
-                    .build());
-        }
-        return ResponseEntity.ok(dtoList);
+        return ResponseEntity.ok(history);
     }
 
     @MessageMapping("/chat.typing")

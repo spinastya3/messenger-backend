@@ -1,5 +1,6 @@
 package com.example.messenger.service;
 
+import com.example.messenger.dto.MessageDto;
 import com.example.messenger.dto.SendMessageRequest;
 import com.example.messenger.model.*;
 import com.example.messenger.repository.ChatRepository;
@@ -13,8 +14,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class MessageService {
@@ -31,12 +35,45 @@ public class MessageService {
     @Autowired
     private ChatRepository chatRepository;
 
-    public List<Message> getChatHistory(Long senderId, Long recipientId, int page, int size) {
+    @Transactional(readOnly = true) // 🚀 Важно! Транзакция должна быть открыта
+    public List<MessageDto> getChatHistory(Long currentUserId, Long recipientId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Long chatId = ChatUtils.generatePrivateChatId(senderId, recipientId);
-        List<Message> history = messageRepository.findChatHistory(chatId, pageable);
-        Collections.reverse(history);
-        return history;
+        Long chatId = ChatUtils.generatePrivateChatId(currentUserId, recipientId);
+
+        // 1. Достаем сообщения (без payloads)
+        List<Message> messages = messageRepository.findChatHistory(chatId, pageable);
+        Collections.reverse(messages);
+
+        if (messages.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 2. Достаем payloads ТОЛЬКО для текущего пользователя
+        List<Long> messageIds = messages.stream().map(Message::getId).toList();
+        List<MessagePayload> payloads = payloadRepository.findPayloadsForUser(messageIds, currentUserId);
+
+        // 3. Группируем payloads по messageId для быстрого доступа
+        Map<Long, MessagePayload> payloadMap = payloads.stream()
+                .collect(Collectors.toMap(p -> p.getMessage().getId(), p -> p));
+
+        // 4. Собираем DTO
+        List<MessageDto> result = new ArrayList<>();
+        for (Message msg : messages) {
+            MessagePayload payload = payloadMap.get(msg.getId());
+
+            result.add(MessageDto.builder()
+                    .id(msg.getId())
+                    .senderId(msg.getSenderId())
+                    .senderName(msg.getSenderName())
+                    .recipientId(msg.getRecipientId())
+                    .content(payload != null ? payload.getEncryptedPayload() : null)
+                    .timestamp(msg.getTimestamp())
+                    .imageUrl(msg.getImageUrl())
+                    .status(payload != null ? payload.getStatus() : MessageStatus.SENT)
+                    .build());
+        }
+
+        return result;
     }
 
     @Transactional

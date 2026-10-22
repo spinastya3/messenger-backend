@@ -1,4 +1,4 @@
-package com.example.messenger.config; // Укажи свой пакет
+package com.example.messenger.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,8 +44,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/*/public-key").permitAll()
                         // 🚀 Разрешаем поиск пользователей (или оставь authenticated, если хочешь защитить)
                         .requestMatchers("/api/users/search").authenticated()
-                        .requestMatchers("/api/auth/debug/**").permitAll()
-                        .requestMatchers("/api/users/debug/**").permitAll()
                         // Всё остальное (включая active-chats) требует токен
                         .anyRequest().authenticated()
                 )

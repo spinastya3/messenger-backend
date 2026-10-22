@@ -231,19 +231,4 @@ public class AuthService {
             System.out.println("🧹 Удалено просроченных reset-кодов: " + deleted);
         }
     }
-
-    @Transactional
-    public void resetKeyForUser(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
-
-        user.setPublicKey(null);
-        userRepository.save(user);
-
-        // 🚀 ПРИНУДИТЕЛЬНО синхронизируем с базой и чистим кэш
-        userRepository.flush();
-        entityManager.clear();
-
-        System.out.println("🧹 [E2EE] Ключ для " + username + " обнулен вручную.");
-    }
 }

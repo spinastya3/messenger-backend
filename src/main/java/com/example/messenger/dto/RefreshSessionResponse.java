@@ -1,4 +1,4 @@
-package com.example.messenger.dto; // Укажи свой правильный пакет
+package com.example.messenger.dto;
 
 public class RefreshSessionResponse {
     private String serverPublicKey;
