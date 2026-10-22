@@ -53,11 +53,28 @@ public class MessageController {
         try {
             Message savedMessage = messageService.sendMessage(sender.getId(), req);
 
-            if (savedMessage.getRecipient() != null) {
-                messagingTemplate.convertAndSend("/topic/messages." + savedMessage.getRecipient().getId(), savedMessage);
-            }
-            if (savedMessage.getSender() != null) {
-                messagingTemplate.convertAndSend("/topic/messages." + savedMessage.getSender().getId(), savedMessage);
+// 🚀 Получаем payload для отправителя и получателя
+            List<MessagePayload> payloads = savedMessage.getPayloads();
+
+            if (payloads != null && !payloads.isEmpty()) {
+                for (MessagePayload payload : payloads) {
+                    // Создаем DTO для сокета (с шифротекстом и ID)
+                    MessageDto socketDto = MessageDto.builder()
+                            .id(savedMessage.getId())
+                            .senderId(savedMessage.getSenderId())
+                            .senderName(savedMessage.getSenderName())
+                            .recipientId(savedMessage.getRecipientId())
+                            .content(payload.getEncryptedPayload()) // 🚀 Вот он, шифротекст!
+                            .timestamp(savedMessage.getTimestamp())
+                            .imageUrl(savedMessage.getImageUrl())
+                            .status(payload.getStatus())
+                            .build();
+
+                    // Отправляем в личный топик получателя этого payload
+                    if (payload.getRecipient() != null) {
+                        messagingTemplate.convertAndSend("/topic/messages." + payload.getRecipient().getId(), socketDto);
+                    }
+                }
             }
 
             // Пуш

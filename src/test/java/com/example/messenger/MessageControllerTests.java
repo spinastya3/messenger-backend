@@ -110,11 +110,28 @@ public class MessageControllerTests {
         Principal mockPrincipal = mock(Principal.class);
         when(mockPrincipal.getName()).thenReturn("гарри");
 
+        // 🚀 Создаем сообщение с payloads (как возвращает MessageService)
         Message savedMessage = new Message();
         savedMessage.setId(100L);
         savedMessage.setSender(senderUser);
         savedMessage.setRecipient(recipientUser);
         savedMessage.setTimestamp(LocalDateTime.now());
+
+        MessagePayload payloadForRecipient = MessagePayload.builder()
+                .message(savedMessage)
+                .recipient(recipientUser)
+                .encryptedPayload("ШИФР_ДЛЯ_ГЕРМИОНЫ")
+                .status(MessageStatus.SENT)
+                .build();
+
+        MessagePayload payloadForSender = MessagePayload.builder()
+                .message(savedMessage)
+                .recipient(senderUser)
+                .encryptedPayload("ШИФР_ДЛЯ_ГАРРИ")
+                .status(MessageStatus.READ)
+                .build();
+
+        savedMessage.setPayloads(List.of(payloadForRecipient, payloadForSender));
 
         // Мокаем поиск юзера
         when(userRepository.findByUsername("гарри")).thenReturn(Optional.of(senderUser));
@@ -127,8 +144,8 @@ public class MessageControllerTests {
         // Проверяем, что сервис вызвался
         verify(messageService).sendMessage(eq(10L), any(SendMessageRequest.class));
 
-        // Проверяем, что сообщение разослано в сокеты (2 вызова)
-        verify(messagingTemplate, times(2)).convertAndSend(anyString(), any(Message.class));
+        // 🚀 Теперь проверяем, что в сокеты ушли MessageDto (2 вызова)
+        verify(messagingTemplate, times(2)).convertAndSend(anyString(), any(MessageDto.class));
     }
 
     @Test
