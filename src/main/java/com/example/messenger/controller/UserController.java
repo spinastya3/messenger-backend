@@ -6,10 +6,15 @@ import com.example.messenger.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -72,5 +77,40 @@ public class UserController {
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Пользователь не найден")));
+    }
+
+
+    @GetMapping("/debug/db-info")
+    public ResponseEntity<?> getDbInfo() {
+        List<User> users = userRepository.findAll();
+        List<Map<String, Object>> userInfo = new ArrayList<>();
+        for (User u : users) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("id", u.getId());
+            info.put("username", u.getUsername());
+            String key = u.getPublicKey();
+            info.put("publicKey_start", (key != null && key.length() > 20) ? key.substring(0, 20) + "..." : key);
+            info.put("publicKey_length", (key != null) ? key.length() : 0);
+            userInfo.add(info);
+        }
+
+        List<Map<String, Object>> columnsInfo = new ArrayList<>();
+        try {
+            List<Object[]> columns = userRepository.getAppUsersColumnsInfo();
+            for (Object[] col : columns) {
+                Map<String, Object> colMap = new HashMap<>();
+                colMap.put("column_name", col[0]);
+                colMap.put("data_type", col[1]);
+                colMap.put("max_length", col[2]);
+                columnsInfo.add(colMap);
+            }
+        } catch (Exception e) {
+            columnsInfo.add(Map.of("error", "Не удалось получить схему: " + e.getMessage()));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("users", userInfo);
+        result.put("columns", columnsInfo);
+        return ResponseEntity.ok(result);
     }
 }

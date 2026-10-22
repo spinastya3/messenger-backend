@@ -5,13 +5,12 @@ import com.example.messenger.model.User;
 import com.example.messenger.repository.PasswordResetCodeRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -24,6 +23,9 @@ public class AuthService {
     private final PasswordResetCodeRepository resetCodeRepository;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
+
+    @PersistenceContext
+    private EntityManager entityManager; // 🚀 Добавь это поле в AuthService
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
@@ -214,6 +216,10 @@ public class AuthService {
         // 🚀 ПРИНУДИТЕЛЬНО ПЕРЕЗАПИСЫВАЕМ КЛЮЧ
         user.setPublicKey(publicKey);
         userRepository.save(user);
+
+        userRepository.flush();
+        entityManager.clear();
+
         System.out.println("🔑 [E2EE] Ключ для " + username + " ПРИНУДИТЕЛЬНО ОБНОВЛЕН.");
     }
 
@@ -230,8 +236,14 @@ public class AuthService {
     public void resetKeyForUser(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+
         user.setPublicKey(null);
         userRepository.save(user);
+
+        // 🚀 ПРИНУДИТЕЛЬНО синхронизируем с базой и чистим кэш
+        userRepository.flush();
+        entityManager.clear();
+
         System.out.println("🧹 [E2EE] Ключ для " + username + " обнулен вручную.");
     }
 }

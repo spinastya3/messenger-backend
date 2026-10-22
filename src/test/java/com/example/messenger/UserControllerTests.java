@@ -9,6 +9,7 @@ import com.example.messenger.model.User;
 import com.example.messenger.repository.MessageRepository;
 import com.example.messenger.repository.UserRepository;
 import com.example.messenger.util.JwtUtil;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;

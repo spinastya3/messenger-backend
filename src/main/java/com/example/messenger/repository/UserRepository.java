@@ -23,4 +23,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Ищем зарегестрированного пользователя
     @Query("SELECT u FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :username, '%'))")
     List<User> searchUsersByUsernameIgnoreCase(@Param("username") String username);
+
+    @Query(value = "SELECT column_name, data_type, character_maximum_length " +
+            "FROM information_schema.columns " +
+            "WHERE table_name = 'app_users'", nativeQuery = true)
+    List<Object[]> getAppUsersColumnsInfo();
 }
