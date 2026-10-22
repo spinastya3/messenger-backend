@@ -82,6 +82,8 @@ public class MessageService {
 
         payloadRepository.saveAll(List.of(payloadForRecipient, payloadForSender));
 
+        message.setPayloads(List.of(payloadForRecipient, payloadForSender));
+
         return message;
     }
 }
