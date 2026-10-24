@@ -114,7 +114,7 @@ public class MessageService {
                 .message(message)
                 .recipient(sender)
                 .encryptedPayload(req.getEncryptedForSender())
-                .status(MessageStatus.READ)
+                .status(MessageStatus.SENT)
                 .build();
 
         payloadRepository.saveAll(List.of(payloadForRecipient, payloadForSender));

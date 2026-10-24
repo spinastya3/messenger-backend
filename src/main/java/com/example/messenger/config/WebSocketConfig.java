@@ -90,7 +90,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             throw new IllegalArgumentException("Невалидный JWT токен для WebSocket");
                         }
                     } else {
-                        System.err.println("🟥 [SOCKET-AUTH] Попытка подключения к сокету без заголовка Authorization!");
                         throw new IllegalArgumentException("Отсутствует токен авторизации");
                     }
                 }
