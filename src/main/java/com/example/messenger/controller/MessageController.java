@@ -134,6 +134,8 @@ public class MessageController {
         messagingTemplate.convertAndSend("/topic/messages.status." + senderId, Map.of(
                 "status", "READ", "recipientId", recipientId, "senderId", senderId
         ));
+
+        System.out.println("📥 [READ] Пришел от " + principal.getName());
     }
 
     @GetMapping("/api/chat/history")
